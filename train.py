@@ -35,7 +35,7 @@ parser.add_argument('--log_path', default='log/', type=str,
                     help='log save path')
 parser.add_argument('--vis_log_path', default='log/vis_log/', type=str,
                     help='log save path')
-parser.add_argument('--workers', default=4, type=int, metavar='N',
+parser.add_argument('--workers', default=0, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--img_w', default=144, type=int,
                     metavar='imgw', help='img width')
@@ -66,7 +66,7 @@ set_seed(args.seed)
 
 dataset = args.dataset
 if dataset == 'sysu':
-    data_path = '../Datasets/SYSU-MM01/ori_data/'
+    data_path = '../Datasets/SYSU-MM01/'
     log_path = args.log_path + 'sysu_log/'
     test_mode = [1, 2]  # thermal to visible
 elif dataset == 'regdb':

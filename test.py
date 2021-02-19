@@ -38,9 +38,9 @@ parser.add_argument('--img_h', default=288, type=int,
                     metavar='imgh', help='img height')
 parser.add_argument('--batch-size', default=8, type=int,
                     metavar='B', help='training batch size')
-parser.add_argument('--test-batch', default=64, type=int,
+parser.add_argument('--test-batch', default=32, type=int,
                     metavar='tb', help='testing batch size')
-parser.add_argument('--method', default='awg', type=str,
+parser.add_argument('--method', default='base', type=str,
                     metavar='m', help='method type: base or awg')
 parser.add_argument('--margin', default=0.3, type=float,
                     metavar='margin', help='triplet loss margin')
@@ -59,7 +59,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 dataset = args.dataset
 if dataset == 'sysu':
-    data_path = '../Datasets/SYSU-MM01/ori_data/'
+    data_path = '../Datasets/SYSU-MM01/'
     n_class = 395
     test_mode = [1, 2]
 elif dataset =='regdb':

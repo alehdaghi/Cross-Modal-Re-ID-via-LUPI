@@ -94,34 +94,71 @@ class visible_module(nn.Module):
     def __init__(self, arch='resnet50'):
         super(visible_module, self).__init__()
 
-        model_v = resnet50(pretrained=True,
-                           last_conv_stride=1, last_conv_dilation=1)
+        if arch == resnet50:
+            resnet = resnet50(pretrained=True,
+                               last_conv_stride=1, last_conv_dilation=1)
+        else:
+            resnet = resnet18(pretrained=True,
+                               last_conv_stride=1, last_conv_dilation=1)
         # avg pooling to global pooling
-        self.visible = model_v
+        self.conv1 = resnet.conv1
+        self.bn1 = resnet.bn1
+        self.relu = resnet.relu
+        self.maxpool = resnet.maxpool
 
     def forward(self, x):
-        x = self.visible.conv1(x)
-        x = self.visible.bn1(x)
-        x = self.visible.relu(x)
-        x = self.visible.maxpool(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
         return x
 
 
 class thermal_module(nn.Module):
     def __init__(self, arch='resnet50'):
         super(thermal_module, self).__init__()
-
-        model_t = resnet50(pretrained=True,
+        if arch == resnet50:
+            resnet = resnet50(pretrained=True,
                            last_conv_stride=1, last_conv_dilation=1)
+        else:
+            resnet = resnet18(pretrained=True,
+                               last_conv_stride=1, last_conv_dilation=1)
         # avg pooling to global pooling
-        self.thermal = model_t
+        self.conv1 = resnet.conv1
+        self.bn1 = resnet.bn1
+        self.relu = resnet.relu
+        self.maxpool = resnet.maxpool
 
     def forward(self, x):
-        x = self.thermal.conv1(x)
-        x = self.thermal.bn1(x)
-        x = self.thermal.relu(x)
-        x = self.thermal.maxpool(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
         return x
+
+class gray_module(nn.Module):
+    def __init__(self, arch='resnet50'):
+        super(gray_module, self).__init__()
+
+        if arch == resnet50:
+            resnet = resnet50(pretrained=True,
+                           last_conv_stride=1, last_conv_dilation=1)
+        else:
+            resnet = resnet18(pretrained=True,
+                               last_conv_stride=1, last_conv_dilation=1)
+        # avg pooling to global pooling
+        self.conv1 = resnet.conv1
+        self.bn1 = resnet.bn1
+        self.relu = resnet.relu
+        self.maxpool = resnet.maxpool
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        return x
+
 
 
 class base_resnet(nn.Module):
@@ -148,6 +185,7 @@ class embed_net(nn.Module):
 
         self.thermal_module = thermal_module(arch=arch)
         self.visible_module = visible_module(arch=arch)
+        self.gray_module = visible_module(arch=arch)
         self.base_resnet = base_resnet(arch=arch)
         self.non_local = no_local
         if self.non_local =='on':
@@ -179,11 +217,14 @@ class embed_net(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.gm_pool = gm_pool
 
-    def forward(self, x1, x2, modal=0):
+    def forward(self, x1, x2, x3=None, modal=0, with_feature = False):
         if modal == 0:
             x1 = self.visible_module(x1)
             x2 = self.thermal_module(x2)
             x = torch.cat((x1, x2), 0)
+            if x3 :
+                x3 = self.gr
+                x = to
         elif modal == 1:
             x = self.visible_module(x1)
         elif modal == 2:
@@ -241,5 +282,7 @@ class embed_net(nn.Module):
 
         if self.training:
             return x_pool, self.classifier(feat)
+        elif with_feature:
+            return self.l2norm(x_pool), self.l2norm(feat), x
         else:
             return self.l2norm(x_pool), self.l2norm(feat)
