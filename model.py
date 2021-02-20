@@ -229,7 +229,7 @@ class embed_net(nn.Module):
             x1 = self.visible_module(x1)
             x2 = self.thermal_module(x2)
             x = torch.cat((x1, x2), 0)
-            if x3 :
+            if x3 is not None :
                 x3 = self.gray_module(x3)
                 x = torch.cat((x, x3), 0)
         elif modal == 1:

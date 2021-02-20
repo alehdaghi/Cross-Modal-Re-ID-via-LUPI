@@ -15,7 +15,7 @@ from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
 from utils import *
-from loss import OriTripletLoss, TripletLoss_WRT
+from loss import OriTripletLoss, TripletLoss_WRT, TripletLoss
 from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
@@ -201,9 +201,12 @@ else:
     loader_batch = args.batch_size * args.num_pos
     criterion_tri= OriTripletLoss(batch_size=loader_batch, margin=args.margin)
 
+cross_triplet_creiteron = TripletLoss(0.3, 'euclidean')
+reconst_loss = nn.MSELoss()
 criterion_id.to(device)
 criterion_tri.to(device)
-
+cross_triplet_creiteron.margin_loss.to(device)
+reconst_loss.to(device)
 
 if args.optim == 'sgd':
     ignored_params = list(map(id, net.bottleneck.parameters())) \
@@ -251,26 +254,40 @@ def train(epoch):
     net.train()
     end = time.time()
 
-    for batch_idx, (input1, input2, label1, label2) in enumerate(trainloader):
+    for batch_idx, (input1, input2, input3, label1, label2, _) in enumerate(trainloader):
 
-        labels = torch.cat((label1, label2), 0)
+        labels = torch.cat((label1, label2, label1), 0)
 
         input1 = Variable(input1.cuda())
         input2 = Variable(input2.cuda())
+        input3 = Variable(input3.cuda())
 
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
 
 
-        feat, out0, = net(input1, input2)
+        feat, out0, = net(input1, input2, x3=input3)
+
+        reconst_loss
+        color_feat, thermal_feat, gray_feat = torch.split(feat, label1.shape[0])
+        color_label, thermal_label, gray_label = torch.split(labels, label1.shape[0])
 
         loss_id = criterion_id(out0, labels)
-        loss_tri, batch_acc = criterion_tri(feat, labels)
-        correct += (batch_acc / 2)
+        #loss_tri, batch_acc = criterion_tri(feat, labels)
+        loss_tri_color   = cross_triplet_creiteron(color_feat, thermal_feat, gray_feat,
+                                                   color_label, thermal_label, gray_label)
+        loss_tri_thermal = cross_triplet_creiteron(thermal_feat, gray_feat, color_feat,
+                                                   thermal_label, gray_label, color_label)
+        loss_tri_gray    = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
+                                                   gray_label, color_label, thermal_label)
+
+        loss_tri = (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3
+        color2gray_loss = reconst_loss(color_feat, gray_feat)
+        #correct += (batch_acc / 2)
         _, predicted = out0.max(1)
         correct += (predicted.eq(labels).sum().item() / 2)
 
-        loss = loss_id + loss_tri
+        loss = loss_id + loss_tri + color2gray_loss
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()

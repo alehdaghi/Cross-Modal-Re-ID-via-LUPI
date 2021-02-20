@@ -25,15 +25,19 @@ class SYSUData(data.Dataset):
 
         img1,  target1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]]
         img2,  target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
-        
+        img3 = self.rgb2gray(img1)
+
         img1 = self.transform(img1)
         img2 = self.transform(img2)
+        img3 = self.transform(np.stack((img3,)*3, axis=-1))
 
-        return img1, img2, target1, target2
+        return img1, img2, img3, target1, target2, target1
 
     def __len__(self):
         return len(self.train_color_label)
-        
+
+    def rgb2gray(self, rgb):
+        return np.dot(rgb[..., :3], [0.299, 0.587, 0.144]).astype(rgb.dtype)
         
 class RegDBData(data.Dataset):
     def __init__(self, data_dir, trial, transform=None, colorIndex = None, thermalIndex = None):
@@ -78,15 +82,21 @@ class RegDBData(data.Dataset):
 
         img1,  target1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]]
         img2,  target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
-        
+        img3 = self.rgb2gray(img1)
+
         img1 = self.transform(img1)
         img2 = self.transform(img2)
+        img3 = self.transform(img3)
 
-        return img1, img2, target1, target2
+        return img1, img2, img3, target1, target2, target1
 
     def __len__(self):
         return len(self.train_color_label)
-        
+
+    def rgb2gray(self, rgb):
+        return np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
+
+
 class TestData(data.Dataset):
     def __init__(self, test_img_file, test_label, transform=None, img_size = (144,288)):
 
