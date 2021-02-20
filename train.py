@@ -58,7 +58,8 @@ parser.add_argument('--seed', default=0, type=int,
 parser.add_argument('--gpu', default='0', type=str,
                     help='gpu device ids for CUDA_VISIBLE_DEVICES')
 parser.add_argument('--mode', default='all', type=str, help='all or indoor')
-
+parser.add_argument('--use_gray', dest='use_gray', help='use gray as 3rd modality', action='store_true')
+parser.set_defaults(use_gray=False)
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -92,6 +93,9 @@ else:
 
 if not args.optim == 'sgd':
     suffix = suffix + '_' + args.optim
+
+if args.use_gray:
+    suffix = suffix + '_gray'
 
 if dataset == 'regdb':
     suffix = suffix + '_trial_{}'.format(args.trial)
@@ -256,37 +260,56 @@ def train(epoch):
 
     for batch_idx, (input1, input2, input3, label1, label2, _) in enumerate(trainloader):
 
-        labels = torch.cat((label1, label2, label1), 0)
+
 
         input1 = Variable(input1.cuda())
         input2 = Variable(input2.cuda())
-        input3 = Variable(input3.cuda())
+        if args.use_gray:
+            labels = torch.cat((label1, label2, label1), 0)
+            input3 = Variable(input3.cuda())
+        else:
+            labels = torch.cat((label1, label2), 0)
+            input3 = None
 
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
 
 
         feat, out0, = net(input1, input2, x3=input3)
+        color2gray_loss = 0
+        if args.use_gray:
+            color_feat, thermal_feat, gray_feat = torch.split(feat, label1.shape[0])
+            color_label, thermal_label, gray_label = torch.split(labels, label1.shape[0])
+            loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, gray_feat,
+                                                     color_label, thermal_label, gray_label)
+            loss_tri_thermal = cross_triplet_creiteron(thermal_feat, gray_feat, color_feat,
+                                                       thermal_label, gray_label, color_label)
+            loss_tri_gray = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
+                                                    gray_label, color_label, thermal_label)
+            loss_tri = (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3
+            color2gray_loss = reconst_loss(color_feat, gray_feat)
 
-        color_feat, thermal_feat, gray_feat = torch.split(feat, label1.shape[0])
-        color_label, thermal_label, gray_label = torch.split(labels, label1.shape[0])
+        else:
+            color_feat, thermal_feat = torch.split(feat, label1.shape[0])
+            color_label, thermal_label = torch.split(labels, label1.shape[0])
+            loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, thermal_feat,
+                                                     color_label, thermal_label, thermal_label)
+            loss_tri_thermal = cross_triplet_creiteron(thermal_feat, color_feat, color_feat,
+                                                       thermal_label, color_label, color_label)
+            loss_tri = (loss_tri_color + loss_tri_thermal) / 2
 
         loss_id = criterion_id(out0, labels)
         #loss_tri, batch_acc = criterion_tri(feat, labels)
-        loss_tri_color   = cross_triplet_creiteron(color_feat, thermal_feat, gray_feat,
-                                                   color_label, thermal_label, gray_label)
-        loss_tri_thermal = cross_triplet_creiteron(thermal_feat, gray_feat, color_feat,
-                                                   thermal_label, gray_label, color_label)
-        loss_tri_gray    = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
-                                                   gray_label, color_label, thermal_label)
 
-        loss_tri = (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3
-        color2gray_loss = reconst_loss(color_feat, gray_feat)
+
+
+
         #correct += (batch_acc / 2)
         _, predicted = out0.max(1)
         correct += (predicted.eq(labels).sum().item() / 2)
 
         loss = loss_id + loss_tri + color2gray_loss
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
