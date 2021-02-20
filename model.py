@@ -189,7 +189,7 @@ class embed_net(nn.Module):
 
         self.thermal_module = thermal_module(arch=arch)
         self.visible_module = visible_module(arch=arch)
-        self.gray_module = visible_module(arch=arch)
+        self.gray_module = gray_module(arch=arch)
         self.base_resnet = base_resnet(arch=arch)
         self.non_local = no_local
         if self.non_local =='on':
@@ -208,13 +208,16 @@ class embed_net(nn.Module):
                 [Non_local(2048) for i in range(non_layers[3])])
             self.NL_4_idx = sorted([layers[3] - (i + 1) for i in range(non_layers[3])])
 
+        if arch == 'resnet50':
+            self.pool_dim = 2048
+        else:
+            self.pool_dim = 512
 
-        pool_dim = 2048
         self.l2norm = Normalize(2)
-        self.bottleneck = nn.BatchNorm1d(pool_dim)
+        self.bottleneck = nn.BatchNorm1d(self.pool_dim)
         self.bottleneck.bias.requires_grad_(False)  # no shift
 
-        self.classifier = nn.Linear(pool_dim, class_num, bias=False)
+        self.classifier = nn.Linear(self.pool_dim, class_num, bias=False)
 
         self.bottleneck.apply(weights_init_kaiming)
         self.classifier.apply(weights_init_classifier)
@@ -227,8 +230,8 @@ class embed_net(nn.Module):
             x2 = self.thermal_module(x2)
             x = torch.cat((x1, x2), 0)
             if x3 :
-                x3 = self.gr
-                x = to
+                x3 = self.gray_module(x3)
+                x = torch.cat((x, x3), 0)
         elif modal == 1:
             x = self.visible_module(x1)
         elif modal == 2:
@@ -290,3 +293,6 @@ class embed_net(nn.Module):
             return self.l2norm(x_pool), self.l2norm(feat), x
         else:
             return self.l2norm(x_pool), self.l2norm(feat)
+
+    def getPoolDim(self):
+        return self.pool_dim

@@ -178,6 +178,9 @@ else:
 net.to(device)
 cudnn.benchmark = True
 
+pool_dim = 2048
+if args.arch == 'resnet18':
+    pool_dim = 512
 if len(args.resume) > 0:
     model_path = checkpoint_path + args.resume
     if os.path.isfile(model_path):
@@ -305,8 +308,8 @@ def test(epoch):
     print('Extracting Gallery Feature...')
     start = time.time()
     ptr = 0
-    gall_feat = np.zeros((ngall, 2048))
-    gall_feat_att = np.zeros((ngall, 2048))
+    gall_feat = np.zeros((ngall, pool_dim))
+    gall_feat_att = np.zeros((ngall, pool_dim))
     with torch.no_grad():
         for batch_idx, (input, label) in enumerate(gall_loader):
             batch_num = input.size(0)
@@ -322,8 +325,8 @@ def test(epoch):
     print('Extracting Query Feature...')
     start = time.time()
     ptr = 0
-    query_feat = np.zeros((nquery, 2048))
-    query_feat_att = np.zeros((nquery, 2048))
+    query_feat = np.zeros((nquery, pool_dim))
+    query_feat_att = np.zeros((nquery, pool_dim))
     with torch.no_grad():
         for batch_idx, (input, label) in enumerate(query_loader):
             batch_num = input.size(0)
