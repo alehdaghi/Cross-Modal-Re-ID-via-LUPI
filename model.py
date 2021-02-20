@@ -94,7 +94,7 @@ class visible_module(nn.Module):
     def __init__(self, arch='resnet50'):
         super(visible_module, self).__init__()
 
-        if arch == resnet50:
+        if arch == 'resnet50':
             resnet = resnet50(pretrained=True,
                                last_conv_stride=1, last_conv_dilation=1)
         else:
@@ -117,7 +117,7 @@ class visible_module(nn.Module):
 class thermal_module(nn.Module):
     def __init__(self, arch='resnet50'):
         super(thermal_module, self).__init__()
-        if arch == resnet50:
+        if arch == 'resnet50':
             resnet = resnet50(pretrained=True,
                            last_conv_stride=1, last_conv_dilation=1)
         else:
@@ -140,7 +140,7 @@ class gray_module(nn.Module):
     def __init__(self, arch='resnet50'):
         super(gray_module, self).__init__()
 
-        if arch == resnet50:
+        if arch == 'resnet50':
             resnet = resnet50(pretrained=True,
                            last_conv_stride=1, last_conv_dilation=1)
         else:
@@ -165,7 +165,11 @@ class base_resnet(nn.Module):
     def __init__(self, arch='resnet50'):
         super(base_resnet, self).__init__()
 
-        model_base = resnet50(pretrained=True,
+        if arch == 'resnet50':
+            model_base = resnet50(pretrained=True,
+                              last_conv_stride=1, last_conv_dilation=1)
+        else:
+            model_base = resnet18(pretrained=True,
                               last_conv_stride=1, last_conv_dilation=1)
         # avg pooling to global pooling
         model_base.avgpool = nn.AdaptiveAvgPool2d((1, 1))
