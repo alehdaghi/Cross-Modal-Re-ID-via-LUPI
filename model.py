@@ -236,6 +236,8 @@ class embed_net(nn.Module):
             x = self.visible_module(x1)
         elif modal == 2:
             x = self.thermal_module(x2)
+        elif modal == 3:
+            x = self.gray_module(x3)
 
         # shared block
         if self.non_local == 'on':

@@ -60,7 +60,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 dataset = args.dataset
 if dataset == 'sysu':
     data_path = '../Datasets/SYSU-MM01/'
-    n_class = 395
+    n_class = 296
     test_mode = [1, 2]
 elif dataset =='regdb':
     data_path = '../Datasets/RegDB/'
@@ -70,12 +70,13 @@ elif dataset =='regdb':
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 best_acc = 0  # best test accuracy
 start_epoch = 0 
-pool_dim = 2048
+
 print('==> Building model..')
 if args.method =='base':
     net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch)
 else:
     net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
+pool_dim = net.getPoolDim()
 net.to(device)    
 cudnn.benchmark = True
 
@@ -118,7 +119,7 @@ def extract_gall_feat(gall_loader):
         for batch_idx, (input, label ) in enumerate(gall_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
-            feat_pool, feat_fc = net(input, input, test_mode[0])
+            feat_pool, feat_fc = net(input, input, modal=test_mode[0])
             gall_feat_pool[ptr:ptr+batch_num,: ] = feat_pool.detach().cpu().numpy()
             gall_feat_fc[ptr:ptr+batch_num,: ]   = feat_fc.detach().cpu().numpy()
             ptr = ptr + batch_num
@@ -136,7 +137,7 @@ def extract_query_feat(query_loader):
         for batch_idx, (input, label ) in enumerate(query_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
-            feat_pool, feat_fc = net(input, input, test_mode[1])
+            feat_pool, feat_fc = net(input, input, modal=test_mode[1])
             query_feat_pool[ptr:ptr+batch_num,: ] = feat_pool.detach().cpu().numpy()
             query_feat_fc[ptr:ptr+batch_num,: ]   = feat_fc.detach().cpu().numpy()
             ptr = ptr + batch_num         

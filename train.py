@@ -268,7 +268,6 @@ def train(epoch):
 
         feat, out0, = net(input1, input2, x3=input3)
 
-        reconst_loss
         color_feat, thermal_feat, gray_feat = torch.split(feat, label1.shape[0])
         color_label, thermal_label, gray_label = torch.split(labels, label1.shape[0])
 
