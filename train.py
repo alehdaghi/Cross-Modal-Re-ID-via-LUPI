@@ -97,6 +97,11 @@ if not args.optim == 'sgd':
 if args.use_gray:
     suffix = suffix + '_gray'
 
+if args.arch == 'resnet18':
+    suffix = suffix + '_arch18'
+
+
+
 if dataset == 'regdb':
     suffix = suffix + '_trial_{}'.format(args.trial)
 
