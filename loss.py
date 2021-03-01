@@ -225,6 +225,61 @@ class TripletLoss(RankingLoss):
         return self.margin_loss(hard_n, hard_p, margin_label)
 
 
+class HetroCenterLoss(nn.Module):
+    """Triplet loss with hard positive/negative mining.
+
+    Reference:
+    Zhu et al. Hetero-Center Loss for Cross-Modality Person Re-Identification. arXiv:1910.09830.
+    Code imported from https://github.com/98zyx/Hetero-center-loss-for-cross-modality-person-re-id/blob/master/heterogeneity_loss.py.
+
+    Args:
+    - margin (float): margin for triplet.
+    - dist_type (string): distance metric type (l2, l1 or cosine) .
+    """
+
+    def __init__(self, margin=0.01, dist_type='l2'):
+        super(HetroCenterLoss, self).__init__()
+        self.margin = margin
+        self.dist_type = dist_type
+        if dist_type == 'l2':
+            self.dist = nn.MSELoss(reduction='sum')
+        if dist_type == 'cos':
+            self.dist = nn.CosineSimilarity(dim=0)
+        if dist_type == 'l1':
+            self.dist = nn.L1Loss()
+
+    def forward(self, feat1, feat2, label1, label2):
+        feat_size = feat1.size()[1]
+        feat_num = feat1.size()[0]
+        label_num = len(label1.unique())
+        # min1 = feat1.min(0, keepdim=True)[0]
+        # max1 = feat1.max(0, keepdim=True)[0]
+        # min2 = feat2.min(0, keepdim=True)[0]
+        # max2 = feat2.max(0, keepdim=True)[0]
+
+
+        center1 = torch.mean(feat1.view(label_num, -1, feat_size), dim=1)
+        center2 = torch.mean(feat2.view(label_num, -1, feat_size), dim=1)
+        # loss = Variable(.cuda())
+        #dist = torch.tensor(0.0, requires_grad=True, device=label1.device)
+        # for i in range(label_num):
+        #     #center1 = 2*(torch.mean(feat1[i], dim=0)-min1)/max1 - 1
+        #     #center2 = 2*(torch.mean(feat2[i], dim=0)-min2)/max2 - 1
+        #     center1 = torch.mean(feat1_c[i], dim=0)
+        #     center2 = torch.mean(feat2_c[i], dim=0)
+        #     if self.dist_type == 'l2' or self.dist_type == 'l1':
+        #         if i == 0:
+        #             dist = max(0, self.dist(center1, center2)/feat_size - self.margin)
+        #         else:
+        #             dist += max(0, self.dist(center1, center2)/feat_size - self.margin)
+        #     elif self.dist_type == 'cos':
+        #         if i == 0:
+        #             dist = max(0, 1 - self.dist(center1, center2) - self.margin)
+        #         else:
+        #             dist += max(0, 1 - self.dist(center1, center2) - self.margin)
+        #dist /= label_num
+        return self.dist(center1, center2)/feat_size
+
 def cosine_dist(x, y):
     '''
 	:param x: torch.tensor, 2d

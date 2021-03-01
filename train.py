@@ -15,7 +15,7 @@ from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
 from utils import *
-from loss import OriTripletLoss, TripletLoss_WRT, TripletLoss
+from loss import OriTripletLoss, TripletLoss_WRT, TripletLoss, HetroCenterLoss
 from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
@@ -212,6 +212,8 @@ else:
 
 cross_triplet_creiteron = TripletLoss(0.3, 'euclidean')
 reconst_loss = nn.MSELoss()
+hetro_loss = HetroCenterLoss()
+
 criterion_id.to(device)
 criterion_tri.to(device)
 cross_triplet_creiteron.margin_loss.to(device)
@@ -254,6 +256,8 @@ def train(epoch):
     train_loss = AverageMeter()
     id_loss = AverageMeter()
     tri_loss = AverageMeter()
+    gray_loss = AverageMeter()
+    center_loss = AverageMeter()
     data_time = AverageMeter()
     batch_time = AverageMeter()
     correct = 0
@@ -281,7 +285,7 @@ def train(epoch):
 
 
         feat, out0, = net(input1, input2, x3=input3)
-        color2gray_loss = 0
+        loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
             color_feat, thermal_feat, gray_feat = torch.split(feat, label1.shape[0])
             color_label, thermal_label, gray_label = torch.split(labels, label1.shape[0])
@@ -292,7 +296,7 @@ def train(epoch):
             loss_tri_gray = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
                                                     gray_label, color_label, thermal_label)
             loss_tri = (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3
-            color2gray_loss = reconst_loss(color_feat, gray_feat)
+            loss_color2gray = reconst_loss(color_feat, gray_feat)
 
         else:
             color_feat, thermal_feat = torch.split(feat, label1.shape[0])
@@ -305,7 +309,7 @@ def train(epoch):
 
         loss_id = criterion_id(out0, labels)
         #loss_tri, batch_acc = criterion_tri(feat, labels)
-
+        loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
 
 
 
@@ -313,7 +317,7 @@ def train(epoch):
         _, predicted = out0.max(1)
         correct += (predicted.eq(labels).sum().item() / 2)
 
-        loss = loss_id + loss_tri + color2gray_loss
+        loss = loss_id + loss_tri + loss_color2gray + loss_center
 
         optimizer.zero_grad()
         loss.backward()
@@ -323,6 +327,8 @@ def train(epoch):
         train_loss.update(loss.item(), 2 * input1.size(0))
         id_loss.update(loss_id.item(), 2 * input1.size(0))
         tri_loss.update(loss_tri.item(), 2 * input1.size(0))
+        gray_loss.update(loss_color2gray.item(), 2 * input1.size(0))
+        center_loss.update(loss_center.item(), 2 * input1.size(0))
         total += labels.size(0)
 
         # measure elapsed time
@@ -335,15 +341,20 @@ def train(epoch):
                   'Loss: {train_loss.val:.4f} ({train_loss.avg:.4f}) '
                   'iLoss: {id_loss.val:.4f} ({id_loss.avg:.4f}) '
                   'TLoss: {tri_loss.val:.4f} ({tri_loss.avg:.4f}) '
+                  'GLoss: {gray_loss.val:.4f} ({gray_loss.avg:.4f}) '
+                  'CLoss: {center_loss.val:.4f} ({center_loss.avg:.4f}) '
                   'Accu: {:.2f}'.format(
                 epoch, batch_idx, len(trainloader), current_lr,
                 100. * correct / total, batch_time=batch_time,
-                train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss))
+                train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss, gray_loss=gray_loss, center_loss=center_loss))
 
     writer.add_scalar('total_loss', train_loss.avg, epoch)
     writer.add_scalar('id_loss', id_loss.avg, epoch)
     writer.add_scalar('tri_loss', tri_loss.avg, epoch)
+    writer.add_scalar('gray_loss', gray_loss.avg, epoch)
+    writer.add_scalar('center_loss', center_loss.avg, epoch)
     writer.add_scalar('lr', current_lr, epoch)
+
 
 
 def test(epoch):

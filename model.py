@@ -3,6 +3,9 @@ import torch.nn as nn
 from torch.nn import init
 from resnet import resnet50, resnet18
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 class Normalize(nn.Module):
     def __init__(self, power=2):
         super(Normalize, self).__init__()
@@ -113,6 +116,16 @@ class visible_module(nn.Module):
         x = self.maxpool(x)
         return x
 
+    def count_params(self):
+        s = count_parameters(self.conv1) + \
+            count_parameters(self.bn1) + \
+            count_parameters(self.relu) + \
+            count_parameters(self.maxpool)
+        # if self.fusion_layer >= 1:
+        #     for i in range(0, self.fusion_layer):
+        #         s = s + count_parameters(self.visible.layers[i])
+        return s
+
 
 class thermal_module(nn.Module):
     def __init__(self, arch='resnet50'):
@@ -135,6 +148,16 @@ class thermal_module(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)
         return x
+
+    def count_params(self):
+        s = count_parameters(self.conv1) + \
+            count_parameters(self.bn1) + \
+            count_parameters(self.relu) + \
+            count_parameters(self.maxpool)
+        # if self.fusion_layer >= 1:
+        #     for i in range(0, self.fusion_layer):
+        #         s = s + count_parameters(self.visible.layers[i])
+        return s
 
 class gray_module(nn.Module):
     def __init__(self, arch='resnet50'):
@@ -159,6 +182,15 @@ class gray_module(nn.Module):
         x = self.maxpool(x)
         return x
 
+    def count_params(self):
+        s = count_parameters(self.conv1) + \
+            count_parameters(self.bn1) + \
+            count_parameters(self.relu) + \
+            count_parameters(self.maxpool)
+        # if self.fusion_layer >= 1:
+        #     for i in range(0, self.fusion_layer):
+        #         s = s + count_parameters(self.visible.layers[i])
+        return s
 
 
 class base_resnet(nn.Module):
@@ -174,6 +206,7 @@ class base_resnet(nn.Module):
         # avg pooling to global pooling
         model_base.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.base = model_base
+        self.fusion_layer = 0
 
     def forward(self, x):
         x = self.base.layer1(x)
@@ -182,6 +215,11 @@ class base_resnet(nn.Module):
         x = self.base.layer4(x)
         return x
 
+    def count_params(self):
+        s = 0
+        for i in range(self.fusion_layer, 4):
+            s = s + count_parameters(self.base.layers[i])
+        return s
 
 class embed_net(nn.Module):
     def __init__(self,  class_num, no_local= 'on', gm_pool = 'on', arch='resnet50'):
@@ -298,3 +336,9 @@ class embed_net(nn.Module):
 
     def getPoolDim(self):
         return self.pool_dim
+
+    def count_params(self):
+        return self.visible_module.count_params() +\
+               self.thermal_module.count_params() +\
+               self.gray_module.count_params() + \
+               self.base_resnet.count_params()

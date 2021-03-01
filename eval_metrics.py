@@ -16,7 +16,7 @@ def eval_sysu(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 20):
     matches = (g_pids[indices] == q_pids[:, np.newaxis]).astype(np.int32)
     
     # compute cmc curve for each query
-    new_all_cmc = []
+    id_all_cmc = []
     all_cmc = []
     all_AP = []
     all_INP = []
@@ -27,22 +27,21 @@ def eval_sysu(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 20):
         q_camid = q_camids[q_idx]
 
         # remove gallery samples that have the same pid and camid with query
-        order = indices[q_idx]
-        remove = (q_camid == 3) & (g_camids[order] == 2)
-        keep = np.invert(remove)
+        #order = indices[q_idx]
+        #remove = (q_camid == 3) & (g_camids[order] == 2)
+        #keep = np.invert(remove)
         
         # compute cmc curve
         # the cmc calculation is different from standard protocol
         # we follow the protocol of the author's released code
-        new_cmc = pred_label[q_idx][keep]
-        new_index = np.unique(new_cmc, return_index=True)[1]
-        new_cmc = [new_cmc[index] for index in sorted(new_index)]
+        id_cmc = pred_label[q_idx]#[keep]
+        id_cmc = id_cmc[np.sort(np.unique(id_cmc, return_index=True)[1])]
         
-        new_match = (new_cmc == q_pid).astype(np.int32)
-        new_cmc = new_match.cumsum()
-        new_all_cmc.append(new_cmc[:max_rank])
+        new_match = (id_cmc == q_pid).astype(np.int32)
+        id_cmc = new_match.cumsum()
+        id_all_cmc.append(id_cmc[:max_rank])
         
-        orig_cmc = matches[q_idx][keep] # binary vector, positions with value 1 are correct matches
+        orig_cmc = matches[q_idx]#[keep] # binary vector, positions with value 1 are correct matches
         if not np.any(orig_cmc):
             # this condition is true when query identity does not appear in gallery
             continue
@@ -64,9 +63,7 @@ def eval_sysu(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 20):
         # compute average precision
         # reference: https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
         num_rel = orig_cmc.sum()
-        tmp_cmc = orig_cmc.cumsum()
-        tmp_cmc = [x / (i+1.) for i, x in enumerate(tmp_cmc)]
-        tmp_cmc = np.asarray(tmp_cmc) * orig_cmc
+        tmp_cmc = orig_cmc.cumsum() / (np.arange(len(orig_cmc)) + 1) * orig_cmc
         AP = tmp_cmc.sum() / num_rel
         all_AP.append(AP)
 
@@ -75,11 +72,11 @@ def eval_sysu(distmat, q_pids, g_pids, q_camids, g_camids, max_rank = 20):
     all_cmc = np.asarray(all_cmc).astype(np.float32)
     all_cmc = all_cmc.sum(0) / num_valid_q   # standard CMC
     
-    new_all_cmc = np.asarray(new_all_cmc).astype(np.float32)
-    new_all_cmc = new_all_cmc.sum(0) / num_valid_q
+    id_all_cmc = np.asarray(id_all_cmc).astype(np.float32)
+    id_all_cmc = id_all_cmc.sum(0) / num_valid_q
     mAP = np.mean(all_AP)
     mINP = np.mean(all_INP)
-    return new_all_cmc, mAP, mINP
+    return id_all_cmc, mAP, mINP
     
     
     
