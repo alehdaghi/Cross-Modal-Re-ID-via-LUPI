@@ -15,7 +15,7 @@ from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
 from utils import *
-from loss import OriTripletLoss, TripletLoss_WRT, TripletLoss, HetroCenterLoss
+from loss import *
 from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
@@ -59,7 +59,10 @@ parser.add_argument('--gpu', default='0', type=str,
                     help='gpu device ids for CUDA_VISIBLE_DEVICES')
 parser.add_argument('--mode', default='all', type=str, help='all or indoor')
 parser.add_argument('--use_gray', dest='use_gray', help='use gray as 3rd modality', action='store_true')
+parser.add_argument('--separate_batch_norm', dest='separate_batch_norm', help='separate batch norm layers only in first layers',
+                    action='store_true')
 parser.set_defaults(use_gray=False)
+parser.set_defaults(separate_batch_norm=False)
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -96,6 +99,9 @@ if not args.optim == 'sgd':
 
 if args.use_gray:
     suffix = suffix + '_gray'
+
+if args.separate_batch_norm:
+    suffix = suffix + '_sepBatch'
 
 if args.arch == 'resnet18':
     suffix = suffix + '_arch18'
@@ -186,7 +192,7 @@ else:
     net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
 net.to(device)
 cudnn.benchmark = True
-
+print(net.count_params())
 pool_dim = 2048
 if args.arch == 'resnet18':
     pool_dim = 512
@@ -213,6 +219,8 @@ else:
 cross_triplet_creiteron = TripletLoss(0.3, 'euclidean')
 reconst_loss = nn.MSELoss()
 hetro_loss = HetroCenterLoss()
+hctriplet = HcTripletLoss(margin=0.8)
+
 
 criterion_id.to(device)
 criterion_tri.to(device)
@@ -222,8 +230,9 @@ reconst_loss.to(device)
 if args.optim == 'sgd':
     ignored_params = list(map(id, net.bottleneck.parameters())) \
                      + list(map(id, net.classifier.parameters()))
-
-    base_params = filter(lambda p: id(p) not in ignored_params, net.parameters())
+    ids = set(map(id, net.parameters()))
+    params = filter(lambda p: id(p) in ids, net.parameters())
+    base_params = filter(lambda p: id(p) not in ignored_params, params)
 
     optimizer = optim.SGD([
         {'params': base_params, 'lr': 0.1 * args.lr},
@@ -310,7 +319,7 @@ def train(epoch):
         loss_id = criterion_id(out0, labels)
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
-
+        l1, _ = hctriplet(feat, labels)
 
 
         #correct += (batch_acc / 2)
@@ -336,7 +345,7 @@ def train(epoch):
         end = time.time()
         if batch_idx % 50 == 0:
             print('Epoch: [{}][{}/{}] '
-                  'Time: {batch_time.val:.3f} ({batch_time.avg:.3f}) '
+                  'Time: {now} ({batch_time.avg:.3f}) '
                   'lr:{:.3f} '
                   'Loss: {train_loss.val:.4f} ({train_loss.avg:.4f}) '
                   'iLoss: {id_loss.val:.4f} ({id_loss.avg:.4f}) '
@@ -345,7 +354,7 @@ def train(epoch):
                   'CLoss: {center_loss.val:.4f} ({center_loss.avg:.4f}) '
                   'Accu: {:.2f}'.format(
                 epoch, batch_idx, len(trainloader), current_lr,
-                100. * correct / total, batch_time=batch_time,
+                100. * correct / total, now=time_now(), batch_time=batch_time,
                 train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss, gray_loss=gray_loss, center_loss=center_loss))
 
     writer.add_scalar('total_loss', train_loss.avg, epoch)
@@ -417,7 +426,7 @@ def test(epoch):
 
 # training
 print('==> Start Training...')
-for epoch in range(start_epoch, 81 - start_epoch):
+for epoch in range(start_epoch, 82):
 
     print('==> Preparing Data Loader...')
     # identity sampler

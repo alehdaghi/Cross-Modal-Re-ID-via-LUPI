@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 from resnet import resnet50, resnet18
+import torchvision
+import copy
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -92,104 +94,38 @@ def weights_init_classifier(m):
             init.zeros_(m.bias.data)
 
 
+def make_bn_new(model):
+    '''
+    copies all batch normalizations layers in the model to new ones
+    Returns:
 
-class visible_module(nn.Module):
+    '''
+    modelNew = model
+    for m in modelNew.modules():
+        if m.__class__.__name__ == "BatchNorm2d":
+            m.weight = nn.Parameter(m.weight.clone())
+            m.bias = nn.Parameter(m.bias.clone())
+    return modelNew
+
+class ShallowModule(nn.Module):
     def __init__(self, arch='resnet50'):
-        super(visible_module, self).__init__()
+        super(ShallowModule, self).__init__()
 
         if arch == 'resnet50':
-            resnet = resnet50(pretrained=True,
-                               last_conv_stride=1, last_conv_dilation=1)
+            resnet = torchvision.models.resnet50(pretrained=True)
         else:
-            resnet = resnet18(pretrained=True,
-                               last_conv_stride=1, last_conv_dilation=1)
+            resnet = torchvision.models.resnet18(pretrained=True)
         # avg pooling to global pooling
-        self.conv1 = resnet.conv1
-        self.bn1 = resnet.bn1
-        self.relu = resnet.relu
-        self.maxpool = resnet.maxpool
+        self.resnet_part1 = nn.Sequential(
+            resnet.conv1, resnet.bn1, resnet.maxpool,  # no relu
+            resnet.layer1)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+        x = self.resnet_part1(x)
         return x
 
     def count_params(self):
-        s = count_parameters(self.conv1) + \
-            count_parameters(self.bn1) + \
-            count_parameters(self.relu) + \
-            count_parameters(self.maxpool)
-        # if self.fusion_layer >= 1:
-        #     for i in range(0, self.fusion_layer):
-        #         s = s + count_parameters(self.visible.layers[i])
-        return s
-
-
-class thermal_module(nn.Module):
-    def __init__(self, arch='resnet50'):
-        super(thermal_module, self).__init__()
-        if arch == 'resnet50':
-            resnet = resnet50(pretrained=True,
-                           last_conv_stride=1, last_conv_dilation=1)
-        else:
-            resnet = resnet18(pretrained=True,
-                               last_conv_stride=1, last_conv_dilation=1)
-        # avg pooling to global pooling
-        self.conv1 = resnet.conv1
-        self.bn1 = resnet.bn1
-        self.relu = resnet.relu
-        self.maxpool = resnet.maxpool
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        return x
-
-    def count_params(self):
-        s = count_parameters(self.conv1) + \
-            count_parameters(self.bn1) + \
-            count_parameters(self.relu) + \
-            count_parameters(self.maxpool)
-        # if self.fusion_layer >= 1:
-        #     for i in range(0, self.fusion_layer):
-        #         s = s + count_parameters(self.visible.layers[i])
-        return s
-
-class gray_module(nn.Module):
-    def __init__(self, arch='resnet50'):
-        super(gray_module, self).__init__()
-
-        if arch == 'resnet50':
-            resnet = resnet50(pretrained=True,
-                           last_conv_stride=1, last_conv_dilation=1)
-        else:
-            resnet = resnet18(pretrained=True,
-                               last_conv_stride=1, last_conv_dilation=1)
-        # avg pooling to global pooling
-        self.conv1 = resnet.conv1
-        self.bn1 = resnet.bn1
-        self.relu = resnet.relu
-        self.maxpool = resnet.maxpool
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        return x
-
-    def count_params(self):
-        s = count_parameters(self.conv1) + \
-            count_parameters(self.bn1) + \
-            count_parameters(self.relu) + \
-            count_parameters(self.maxpool)
-        # if self.fusion_layer >= 1:
-        #     for i in range(0, self.fusion_layer):
-        #         s = s + count_parameters(self.visible.layers[i])
+        s = count_parameters(self.resnet_part1)
         return s
 
 
@@ -198,36 +134,37 @@ class base_resnet(nn.Module):
         super(base_resnet, self).__init__()
 
         if arch == 'resnet50':
-            model_base = resnet50(pretrained=True,
-                              last_conv_stride=1, last_conv_dilation=1)
+            resnet = torchvision.models.resnet50(pretrained=True)
+            resnet.layer4[0].conv2.stride = (1, 1)
         else:
-            model_base = resnet18(pretrained=True,
-                              last_conv_stride=1, last_conv_dilation=1)
+            resnet = torchvision.models.resnet18(pretrained=True)
+            resnet.layer4[0].conv1.stride = (1, 1)
         # avg pooling to global pooling
-        model_base.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.base = model_base
-        self.fusion_layer = 0
+
+        resnet.layer4[0].downsample[0].stride = (1, 1)
+
+        self.resnet_part2 = nn.Sequential(resnet.layer2, resnet.layer3, resnet.layer4)
 
     def forward(self, x):
-        x = self.base.layer1(x)
-        x = self.base.layer2(x)
-        x = self.base.layer3(x)
-        x = self.base.layer4(x)
+        x = self.resnet_part2(x)
         return x
 
     def count_params(self):
-        s = 0
-        for i in range(self.fusion_layer, 4):
-            s = s + count_parameters(self.base.layers[i])
+        s = count_parameters(self.resnet_part2)
         return s
 
 class embed_net(nn.Module):
-    def __init__(self,  class_num, no_local= 'on', gm_pool = 'on', arch='resnet50'):
+    def __init__(self,  class_num, no_local= 'on', gm_pool = 'on', arch='resnet50', separate_batch_norm=False):
         super(embed_net, self).__init__()
 
-        self.thermal_module = thermal_module(arch=arch)
-        self.visible_module = visible_module(arch=arch)
-        self.gray_module = gray_module(arch=arch)
+        self.thermal_module = ShallowModule(arch=arch)
+        if separate_batch_norm :
+            self.visible_module = make_bn_new(self.thermal_module)
+            self.gray_module = make_bn_new(self.thermal_module)
+        else:
+            self.visible_module = ShallowModule(arch=arch)
+            self.gray_module = ShallowModule(arch=arch)
+
         self.base_resnet = base_resnet(arch=arch)
         self.non_local = no_local
         if self.non_local =='on':
@@ -338,7 +275,7 @@ class embed_net(nn.Module):
         return self.pool_dim
 
     def count_params(self):
-        return self.visible_module.count_params() +\
-               self.thermal_module.count_params() +\
-               self.gray_module.count_params() + \
-               self.base_resnet.count_params()
+        ids = set(map(id, self.parameters()))
+        params = filter(lambda p: id(p) in ids, self.parameters())
+        return sum(p.numel() for p in params if p.requires_grad)
+

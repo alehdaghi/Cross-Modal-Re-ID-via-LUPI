@@ -64,7 +64,7 @@ class Explanation_generator:
 
 
         # path to load the pretrained model
-        resume = './save_model/sysu_base_p4_n12_lr_0.1_seed_0_best.t'
+        resume = './save_model/sysu_base_p4_n10_lr_0.1_seed_0_arch50_epoch_80.t'
         #resume = './save_model/sysu_base_p4_n8_lr_0.1_seed_0_first.t'
         checkpoint = torch.load(resume)
 
@@ -72,14 +72,16 @@ class Explanation_generator:
         # resume model
         print('load model from {}'.format(resume))
 
-        #model_1.load_state_dict(weight)
-        #model_2.load_state_dict(weight)
+        model_1.load_state_dict(weight)
+        model_2.load_state_dict(weight)
 
         model_1 = model_1.eval().cuda()
         model_2 = model_2.eval().cuda()
 
-        embed_1, _1, map_1 = model_1(inputs_1, inputs_2, test_mode1, True)
-        embed_2, _2, map_2 = model_2(inputs_2, inputs_2, test_mode2, True)
+        embed_1, _1, map_1 = model_1(inputs_1, inputs_2,
+                                     modal=test_mode1, with_feature=True)
+        embed_2, _2, map_2 = model_2(inputs_2, inputs_2,
+                                     modal=test_mode2, with_feature=True)
 
         fc_1 = None#model_1.module.classifier.classifier.cpu()
         fc_2 = None#model_2.module.classifier.classifier.cpu()
@@ -159,15 +161,18 @@ class Explanation_generator:
             map_1_embed = map_1_reshape * weight_1
             map_2_embed = map_2_reshape * weight_2
             # reshape back
-            map_1_embed = np.reshape(map_1_embed, [map_1.shape[1], map_1.shape[2], -1])
-            map_2_embed = np.reshape(map_2_embed, [map_2.shape[1], map_2.shape[2], -1])
-
-            Decomposition = np.zeros([map_1.shape[1],map_1.shape[2],map_2.shape[1],map_2.shape[2]])
-            for i in range(map_1.shape[1]):
-                for j in range(map_1.shape[2]):
-                    for x in range(map_2.shape[1]):
-                        for y in range(map_2.shape[2]):
-                            Decomposition[i,j,x,y] = np.sum(map_1_embed[i,j]*map_2_embed[x,y])
+            Decomposition = np.matmul(map_1_embed, np.transpose(map_2_embed)).reshape(
+                (map_1.shape[1], map_1.shape[2], map_2.shape[1], map_2.shape[2]))
+            # map_1_embed = np.reshape(map_1_embed, [map_1.shape[1], map_1.shape[2], -1])
+            # map_2_embed = np.reshape(map_2_embed, [map_2.shape[1], map_2.shape[2], -1])
+            #
+            #
+            # Decomposition = np.zeros([map_1.shape[1],map_1.shape[2],map_2.shape[1],map_2.shape[2]], dtype=np.float32)
+            # for i in range(map_1.shape[1]):
+            #     for j in range(map_1.shape[2]):
+            #         for x in range(map_2.shape[1]):
+            #             for y in range(map_2.shape[2]):
+            #                 Decomposition[i,j,x,y] = np.sum(map_1_embed[i,j]*map_2_embed[x,y])
             Decomposition = Decomposition / np.max(Decomposition)
             Decomposition = np.maximum(Decomposition, 0)
             return Decomposition
@@ -197,7 +202,7 @@ class Explanation_generator:
                          decom_padding[x_max, y_max]*dx*dy
         return np.maximum(interplolation,0)
 
-    def demo(self, path_1='../Datasets/SYSU-MM01/cam1/0006/0022.jpg', \
+    def demo(self, path_1='../Datasets/SYSU-MM01/cam1/0006/0012.jpg', \
                    path_2='../Datasets/SYSU-MM01/cam6/0006/0012.jpg', \
                    size = (img_w, img_h)):
         '''
@@ -245,13 +250,15 @@ class Explanation_generator:
         '''
             Generate overall activation map using activation decomposition ("Decomposition"),
         '''
-
+        N = 5
         # compute the overall activation map with decomposition (no bias term)
         self.Decomposition = self.Overall_map(map_1 = map_1, map_2 = map_2, fc_1 = fc_1, fc_2 = fc_2, bn_1 = bn_1, bn_2 = bn_2, mode = 'GAP')
-
-        decom_1 = cv2.resize(np.sum(self.Decomposition, axis=(2, 3)), (size1[1],size1[0]))
+        D = self.Decomposition.reshape(self.Decomposition.shape[0]*self.Decomposition.shape[1], -1)
+        i = np.argsort(D, axis=1)[:, -N:]
+        decom_1 = cv2.resize(np.sum(np.take_along_axis(D, i, axis=1), axis=1).reshape(self.Decomposition.shape[0], -1), (size1[1],size1[0]))
         decom_1 = decom_1 / np.max(decom_1)
-        decom_2 = cv2.resize(np.sum(self.Decomposition, axis=(0, 1)), (size2[1],size2[0]))
+        i = np.argsort(D, axis=0)[-N:, :]
+        decom_2 = cv2.resize(np.sum(np.take_along_axis(D, i, axis=0), axis=0).reshape(self.Decomposition.shape[2], -1), (size2[1],size2[0]))
         decom_2 = decom_2 / np.max(decom_2)
 
         image_overlay_1 = image_1 * 0.7 + self.imshow_convert(decom_1) / 255.0 * 0.3

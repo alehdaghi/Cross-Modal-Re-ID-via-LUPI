@@ -44,6 +44,7 @@ sns.set(rc={'figure.figsize':(11.7,8.27)})
 MACHINE_EPSILON = np.finfo(np.double).eps
 n_components = 2
 perplexity = 30
+pool_dim = 2048
 
 def fit(X):
     n_samples = X.shape[0]
@@ -137,8 +138,10 @@ def _gradient_descent(obj_func, p0, args, it=0, n_iter=1000,
 L = 10
 data_path = '../Datasets/SYSU-MM01/'
 n_class = 395
-query_img, query_label, query_cam = process_query_sysu(data_path)
-gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, trial=0)
+query_img, query_label, query_cam = process_query_sysu(data_path,
+                                                      file_path='exp/train_id.txt')
+gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, trial=0, single_shot=False,
+                                                      file_path='exp/train_id.txt')
 nquery = len(query_label)
 ngall = len(gall_label)
 img_size = (144,288)
@@ -146,8 +149,10 @@ img_size = (144,288)
 def extractFeat(imgs, labels, cams, TEST_TYPE ):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     n_class = 296
-    net = embed_net(n_class, no_local='on', gm_pool='on', arch='resnet50')
-    resume = './save_model/sysu_base_p4_n12_lr_0.1_seed_0_best.t'
+    net = embed_net(n_class, no_local='off', gm_pool='off', arch='resnet50')
+    resume = './save_model/sysu_base_p4_n10_lr_0.1_seed_0_gray_epoch_80.t'
+    #resume = 'save_model/sysu_base_p6_n8_lr_0.1_seed_2_epoch_80.t'
+    pool_dim = net.getPoolDim()
     #resume = './save_model/sysu_base_p4_n8_lr_0.1_seed_0_first.t'
     checkpoint = torch.load(resume)
     net.to(device)
@@ -156,7 +161,7 @@ def extractFeat(imgs, labels, cams, TEST_TYPE ):
 
     with torch.no_grad():
 
-        XX = np.empty((0, 2048))
+        XX = np.empty((0, pool_dim))
         YY = np.empty(0, np.int)
         CC = np.empty(0, np.int)
 
@@ -172,6 +177,10 @@ def extractFeat(imgs, labels, cams, TEST_TYPE ):
                 img = Image.open(imgs[j])
                 img = img.resize((img_size[0], img_size[1]), Image.ANTIALIAS)
                 img = np.array(img)
+                if TEST_TYPE == 3:
+                    img = np.dot(img[..., :3], [0.299, 0.587, 0.144]).astype(img.dtype)
+                    img = np.stack((img,) * 3, axis=-1)
+
                 x = transform_test(img)
                 y1 = labels[j]
                 c1 = cams[j]
@@ -187,8 +196,8 @@ def extractFeat(imgs, labels, cams, TEST_TYPE ):
             i = 0
             while i < len(X):
                 j = min(i+20, len(X))
-                res = net(X[i:j], X[i:j], TEST_TYPE)
-                XX = np.append(XX, res[1].cpu().numpy() , axis=0)
+                res = net(X[i:j], X[i:j], x3 = X[i:j], modal=TEST_TYPE)
+                XX = np.append(XX, res[0].cpu().numpy() , axis=0)
                 i = j
 
     return XX, YY, CC
@@ -197,10 +206,11 @@ def extractFeat(imgs, labels, cams, TEST_TYPE ):
 
 
 USE_NET = True
-USE_OTHER = False
+USE_OTHER = True
 if USE_NET:
-    XQ, yQ, cQ = extractFeat(query_img, query_label, query_cam, 1)
-    XG, yG, cG = extractFeat(gall_img, gall_label, gall_cam, 2)
+    XQ, yQ, cQ = extractFeat(query_img, query_label, query_cam, 2)
+    #XQ, yQ, cQ = extractFeat(gall_img, gall_label, gall_cam, 1)
+    XG, yG, cG = extractFeat(gall_img, gall_label, gall_cam, 1)
     X = np.append(XQ, XG, axis=0)
     y = np.append(yQ, yG, axis=0)
     c = np.append(cQ, cG, axis=0)
@@ -208,13 +218,25 @@ if USE_NET:
     np.save('X.npy', X_embedded)
     np.save('y.npy', y)
     np.save('c.npy', c)
+    i1 = np.unique(yQ, return_counts=True)[1]
+    i2 = np.unique(yG, return_counts=True)[1]
+
+    f1 = np.split(XQ, np.cumsum(i1[:-1]))
+    f2 = np.split(XG, np.cumsum(i2[:-1]))
+    c1 = np.asarray([np.mean(f, axis=0) for f in f1])
+    c2 = np.asarray([np.mean(f, axis=0) for f in f2])
+
 
 else:
     if USE_OTHER:
-        X = np.load('/home/mahdi/PycharmProjects/AlignGAN/out/base/features/X.npy')
+        X = np.load('/home/mahdi/PycharmProjects/DGTL-for-VT-ReID/f.npy')
+        y = np.load('/home/mahdi/PycharmProjects/DGTL-for-VT-ReID/p.npy')
+        c = np.load('/home/mahdi/PycharmProjects/DGTL-for-VT-ReID/c.npy')
+        Ls = np.unique(y)[0:L]
+        X = X[np.isin(y, Ls)]
+        c = c[np.isin(y, Ls)]
+        y = y[np.isin(y, Ls)]
         X_embedded = fit(X)
-        y = np.load('/home/mahdi/PycharmProjects/AlignGAN/out/base/features/y.npy')
-        c = np.load('/home/mahdi/PycharmProjects/AlignGAN/out/base/features/c.npy')
     else:
         X_embedded = np.load('X.npy')
         y = np.load('y.npy')
@@ -230,8 +252,8 @@ df['c'] = c
 
 sns.set_theme()
 p = sns.hls_palette(L, h=.5)
-plt.title("Visualize features of "+str(L) +" identity (Test set)" )
-palette = ['green','orange','gray', 'brown','dodgerblue','dark']
-g=sns.scatterplot(data=df, x='x', y='y', style= 'id', hue='c', palette=['green','orange','gray', 'brown','dodgerblue','black'])
+plt.title("Visualize features of "+str(L) +" identity (Resnet50, Part-Att)" )
+palette = ['green', 'orange', 'gray', 'brown', 'dodgerblue', 'black']
+g=sns.scatterplot(data=df, x='x', y='y', style= 'id', hue='c', palette=palette)
 plt.legend(bbox_to_anchor=(1.01, 1),borderaxespad=0)
 plt.show()

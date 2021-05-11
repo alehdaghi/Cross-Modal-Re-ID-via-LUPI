@@ -3,13 +3,13 @@ import os
 import numpy as np
 import random
 
-def process_query_sysu(data_path, mode = 'all', relabel=False):
+def process_query_sysu(data_path, mode = 'all', relabel=False, file_path='exp/test_id.txt'):
     if mode== 'all':
         ir_cameras = ['cam3','cam6']
     elif mode =='indoor':
         ir_cameras = ['cam3','cam6']
     
-    file_path = os.path.join(data_path,'exp/test_id.txt')
+    file_path = os.path.join(data_path,file_path)
     files_rgb = []
     files_ir = []
 
@@ -34,7 +34,7 @@ def process_query_sysu(data_path, mode = 'all', relabel=False):
         query_cam.append(camid)
     return query_img, np.array(query_id), np.array(query_cam)
 
-def process_gallery_sysu(data_path, mode = 'all', trial = 0, single_shot=True):
+def process_gallery_sysu(data_path, mode = 'all', trial = 0, single_shot=True,  file_path='exp/test_id.txt'):
     
     random.seed(trial)
     
@@ -43,7 +43,7 @@ def process_gallery_sysu(data_path, mode = 'all', trial = 0, single_shot=True):
     elif mode =='indoor':
         rgb_cameras = ['cam1','cam2']
         
-    file_path = os.path.join(data_path,'exp/test_id.txt')
+    file_path = os.path.join(data_path,file_path)
     files_rgb = []
     with open(file_path, 'r') as file:
         ids = file.read().splitlines()

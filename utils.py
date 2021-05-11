@@ -4,6 +4,10 @@ from torch.utils.data.sampler import Sampler
 import sys
 import os.path as osp
 import torch
+import time
+
+def time_now():
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 
 def load_data(input_data_path ):
     with open(input_data_path) as f:
