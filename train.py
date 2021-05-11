@@ -187,9 +187,9 @@ print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
 print('==> Building model..')
 if args.method =='base':
-    net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch)
+    net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
 else:
-    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
+    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
 net.to(device)
 cudnn.benchmark = True
 print(net.count_params())
