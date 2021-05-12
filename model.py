@@ -101,11 +101,27 @@ def make_bn_new(model):
 
     '''
     modelNew = model
-    for m in modelNew.modules():
+    modules = list(modelNew.modules())
+    for i, m in enumerate(model.modules()):
         if m.__class__.__name__ == "BatchNorm2d":
-            m.weight = nn.Parameter(m.weight.clone())
-            m.bias = nn.Parameter(m.bias.clone())
+            #modules[i]
+            modules[i].weight = nn.Parameter(m.weight.clone())
+            modules[i].bias = nn.Parameter(m.bias.clone())
     return modelNew
+
+def make_conv_params_same(model1, model2):
+    '''
+    copies all batch normalizations layers in the model to new ones
+    Returns:
+
+    '''
+
+    for m1, m2 in zip(model1.modules(), model2.modules()):
+        if m1.__class__.__name__ == "Conv2d":
+            #modules[i]
+            m1.weight = m2.weight
+            m1.bias = m2.bias
+
 
 class ShallowModule(nn.Module):
     def __init__(self, arch='resnet50'):
@@ -158,12 +174,13 @@ class embed_net(nn.Module):
         super(embed_net, self).__init__()
 
         self.thermal_module = ShallowModule(arch=arch)
+        self.visible_module = ShallowModule(arch=arch)
+        self.gray_module = ShallowModule(arch=arch)
+
         if separate_batch_norm :
-            self.visible_module = make_bn_new(self.thermal_module)
-            self.gray_module = make_bn_new(self.thermal_module)
-        else:
-            self.visible_module = ShallowModule(arch=arch)
-            self.gray_module = ShallowModule(arch=arch)
+            make_conv_params_same(self.visible_module, self.thermal_module)
+            make_conv_params_same(self.gray_module, self.thermal_module)
+
 
         self.base_resnet = base_resnet(arch=arch)
         self.non_local = no_local
