@@ -4,15 +4,17 @@ import torch.utils.data as data
 
 
 class SYSUData(data.Dataset):
-    def __init__(self, data_dir,  transform=None, colorIndex = None, thermalIndex = None):
+    def __init__(self, data_dir,  transform=None, colorIndex = None, thermalIndex = None, gray=False):
         
         data_dir = '../Datasets/SYSU-MM01/'
         # Load training images (path) and labels
         train_color_image = np.load(data_dir + 'train_rgb_resized_img.npy')
         self.train_color_label = np.load(data_dir + 'train_rgb_resized_label.npy')
+        self.train_color_cam = np.load(data_dir + 'train_rgb_resized_camera.npy')
 
         train_thermal_image = np.load(data_dir + 'train_ir_resized_img.npy')
         self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
+        self.train_thermal_cam = np.load(data_dir + 'train_ir_resized_camera.npy')
         
         # BGR to RGB
         self.train_color_image   = train_color_image
@@ -20,18 +22,24 @@ class SYSUData(data.Dataset):
         self.transform = transform
         self.cIndex = colorIndex
         self.tIndex = thermalIndex
+        self.returnsGray = gray
 
     def __getitem__(self, index):
 
-        img1,  target1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]]
-        img2,  target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
-        img3 = self.rgb2gray(img1)
+        img1,  target1, cam1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]], self.train_color_cam[self.cIndex[index]]
+        img2,  target2, cam2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]], self.train_thermal_cam[self.tIndex[index]]
+        img3 = None
+        if self.returnsGray:
+            img3 = self.rgb2gray(img1)
+            img3 = self.transform(np.stack((img3,)*3, axis=-1))
 
         img1 = self.transform(img1)
         img2 = self.transform(img2)
-        img3 = self.transform(np.stack((img3,)*3, axis=-1))
 
-        return img1, img2, img3, target1, target2, target1
+        if self.returnsGray:
+            return img1, img2, img3, target1, target2, target1
+        else:
+            return img1, img2, target1, target2, cam1-1, cam2-1
 
     def __len__(self):
         return len(self.train_color_label)
@@ -98,7 +106,7 @@ class RegDBData(data.Dataset):
 
 
 class TestData(data.Dataset):
-    def __init__(self, test_img_file, test_label, transform=None, img_size = (144,288)):
+    def __init__(self, test_img_file, test_label, test_cam, transform=None, img_size = (144,288)):
 
         test_image = []
         for i in range(len(test_img_file)):
@@ -109,12 +117,13 @@ class TestData(data.Dataset):
         test_image = np.array(test_image)
         self.test_image = test_image
         self.test_label = test_label
+        self.test_cam = test_cam
         self.transform = transform
 
     def __getitem__(self, index):
-        img1,  target1 = self.test_image[index],  self.test_label[index]
+        img1,  target1, cam1 = self.test_image[index],  self.test_label[index], self.test_cam[index]
         img1 = self.transform(img1)
-        return img1, target1
+        return img1, target1, cam1 - 1
 
     def __len__(self):
         return len(self.test_image)

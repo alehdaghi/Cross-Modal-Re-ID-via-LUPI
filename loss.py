@@ -7,7 +7,7 @@ from torch.autograd import Variable
 
 
 class OriTripletLoss(nn.Module):
-    """Triplet loss with hard positive/negative mining.
+    """Triplet losses with hard positive/negative mining.
     
     Reference:
     Hermans et al. In Defense of the Triplet Loss for Person Re-Identification. arXiv:1703.07737.
@@ -45,7 +45,7 @@ class OriTripletLoss(nn.Module):
         dist_ap = torch.cat(dist_ap)
         dist_an = torch.cat(dist_an)
 
-        # Compute ranking hinge loss
+        # Compute ranking hinge losses
         y = torch.ones_like(dist_an)
         loss = self.ranking_loss(dist_an, dist_ap, y)
 
@@ -176,7 +176,7 @@ class RankingLoss:
 
 class TripletLoss(RankingLoss):
     '''
-    Compute Triplet loss augmented with Batch Hard
+    Compute Triplet losses augmented with Batch Hard
     Details can be seen in 'In defense of the Triplet Loss for Person Re-Identification'
     '''
 
@@ -226,7 +226,7 @@ class TripletLoss(RankingLoss):
 
 
 class HetroCenterLoss(nn.Module):
-    """Triplet loss with hard positive/negative mining.
+    """Triplet losses with hard positive/negative mining.
 
     Reference:
     Zhu et al. Hetero-Center Loss for Cross-Modality Person Re-Identification. arXiv:1910.09830.
@@ -260,7 +260,7 @@ class HetroCenterLoss(nn.Module):
 
         center1 = torch.mean(feat1.view(label_num, -1, feat_size), dim=1)
         center2 = torch.mean(feat2.view(label_num, -1, feat_size), dim=1)
-        # loss = Variable(.cuda())
+        # losses = Variable(.cuda())
         #dist = torch.tensor(0.0, requires_grad=True, device=label1.device)
         # for i in range(label_num):
         #     #center1 = 2*(torch.mean(feat1[i], dim=0)-min1)/max1 - 1
@@ -282,10 +282,10 @@ class HetroCenterLoss(nn.Module):
 
 
 class HcTripletLoss(nn.Module):
-    """Hetero-center-triplet-loss-for-VT-Re-ID.
+    """Hetero-center-triplet-losses-for-VT-Re-ID.
 
     Reference:
-    Parameter Sharing Exploration and Hetero center triplet loss for VT Re-ID,TMM.
+    Parameter Sharing Exploration and Hetero center triplet losses for VT Re-ID,TMM.
     Code imported from https://github.com/hijune6/Hetero-center-triplet-loss-for-VT-Re-ID/blob/main/loss.py.
 
     Args:
@@ -329,7 +329,7 @@ class HcTripletLoss(nn.Module):
         dist_ap = torch.cat(dist_ap)
         dist_an = torch.cat(dist_an)
 
-        # Compute ranking hinge loss
+        # Compute ranking hinge losses
         y = torch.ones_like(dist_an)
         loss = self.ranking_loss(dist_an, dist_ap, y)
 
@@ -339,7 +339,7 @@ class HcTripletLoss(nn.Module):
 
 
 class CrossEntropyLabelSmooth(nn.Module):
-    """Cross entropy loss with label smoothing regularizer.
+    """Cross entropy losses with label smoothing regularizer.
     Reference:
     Szegedy et al. Rethinking the Inception Architecture for Computer Vision. CVPR 2016.
     Equation: y = (1 - epsilon) * y + epsilon / K.
@@ -366,6 +366,56 @@ class CrossEntropyLabelSmooth(nn.Module):
         if self.use_gpu: targets = targets.cuda()
         targets = (1 - self.epsilon) * targets + self.epsilon / self.num_classes
         loss = (- targets * log_probs).mean(0).sum()
+        return loss
+
+
+class CenterLoss(nn.Module):
+    """Center losses.
+
+    Reference:
+    Wen et al. A Discriminative Feature Learning Approach for Deep Face Recognition. ECCV 2016.
+
+    Args:
+        num_classes (int): number of classes.
+        feat_dim (int): feature dimension.
+    """
+
+    def __init__(self, num_classes=751, feat_dim=2048, use_gpu=True):
+        super(CenterLoss, self).__init__()
+        self.num_classes = num_classes
+        self.feat_dim = feat_dim
+        self.use_gpu = use_gpu
+
+        if self.use_gpu:
+            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim).cuda())
+        else:
+            self.centers = nn.Parameter(torch.randn(self.num_classes, self.feat_dim))
+
+    def forward(self, x, labels):
+        """
+        Args:
+            x: feature matrix with shape (batch_size, feat_dim).
+            labels: ground truth labels with shape (num_classes).
+        """
+        assert x.size(0) == labels.size(0), "features.size(0) is not equal to labels.size(0)"
+
+        batch_size = x.size(0)
+        distmat = torch.pow(x, 2).sum(dim=1, keepdim=True).expand(batch_size, self.num_classes) + \
+                  torch.pow(self.centers, 2).sum(dim=1, keepdim=True).expand(self.num_classes, batch_size).t()
+        distmat.addmm_(1, -2, x, self.centers.t())
+
+        classes = torch.arange(self.num_classes).long()
+        if self.use_gpu: classes = classes.cuda()
+        labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
+        mask = labels.eq(classes.expand(batch_size, self.num_classes))
+
+        dist = []
+        for i in range(batch_size):
+            value = distmat[i][mask[i]]
+            value = value.clamp(min=1e-12, max=1e+12)  # for numerical stability
+            dist.append(value)
+        dist = torch.cat(dist)
+        loss = dist.mean()
         return loss
 
 

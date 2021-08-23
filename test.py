@@ -43,7 +43,7 @@ parser.add_argument('--test-batch', default=32, type=int,
 parser.add_argument('--method', default='base', type=str,
                     metavar='m', help='method type: base or awg')
 parser.add_argument('--margin', default=0.3, type=float,
-                    metavar='margin', help='triplet loss margin')
+                    metavar='margin', help='triplet losses margin')
 parser.add_argument('--num_pos', default=4, type=int,
                     help='num of pos per identity in each modality')
 parser.add_argument('--trial', default=1, type=int,
@@ -151,7 +151,7 @@ if dataset == 'sysu':
 
     print('==> Resuming from checkpoint..')
     if len(args.resume) > 0:
-        model_path = checkpoint_path + args.resume
+        model_path = args.resume
         # model_path = checkpoint_path + 'sysu_awg_p4_n8_lr_0.1_seed_0_best.t'
         if os.path.isfile(model_path):
             print('==> loading checkpoint {}'.format(args.resume))

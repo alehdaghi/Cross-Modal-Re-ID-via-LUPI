@@ -14,8 +14,9 @@ from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
+from transformer.make_model import make_model
 from utils import *
-from loss import *
+from losses import *
 from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
@@ -48,7 +49,7 @@ parser.add_argument('--test-batch', default=64, type=int,
 parser.add_argument('--method', default='agw', type=str,
                     metavar='m', help='method type: base or agw')
 parser.add_argument('--margin', default=0.3, type=float,
-                    metavar='margin', help='triplet loss margin')
+                    metavar='margin', help='triplet losses margin')
 parser.add_argument('--num_pos', default=4, type=int,
                     help='num of pos per identity in each modality')
 parser.add_argument('--trial', default=1, type=int,
@@ -190,6 +191,8 @@ if args.method =='base':
     net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
 else:
     net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
+
+net = make_model( num_class=n_class, camera_num=6, view_num = 1)
 net.to(device)
 cudnn.benchmark = True
 print(net.count_params())
@@ -208,13 +211,13 @@ if len(args.resume) > 0:
     else:
         print('==> no checkpoint found at {}'.format(args.resume))
 
-# define loss function
+# define losses function
 criterion_id = nn.CrossEntropyLoss()
 if args.method == 'agw':
     criterion_tri = TripletLoss_WRT()
 else:
     loader_batch = args.batch_size * args.num_pos
-    criterion_tri= OriTripletLoss(batch_size=loader_batch, margin=args.margin)
+    criterion_tri = OriTripletLoss(batch_size=loader_batch, margin=args.margin)
 
 cross_triplet_creiteron = TripletLoss(0.3, 'euclidean')
 reconst_loss = nn.MSELoss()
