@@ -14,9 +14,8 @@ from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
-from transformer.make_model import make_model
 from utils import *
-from losses import *
+from loss import *
 from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
@@ -163,8 +162,8 @@ elif dataset == 'regdb':
     query_img, query_label = process_test_regdb(data_path, trial=args.trial, modal='visible')
     gall_img, gall_label = process_test_regdb(data_path, trial=args.trial, modal='thermal')
 
-gallset = TestData(gall_img, gall_label, transform=transform_test, img_size=(args.img_w, args.img_h))
-queryset = TestData(query_img, query_label, transform=transform_test, img_size=(args.img_w, args.img_h))
+gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
+queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
 
 # testing data loader
 gall_loader = data.DataLoader(gallset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
@@ -192,7 +191,6 @@ if args.method =='base':
 else:
     net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
 
-net = make_model( num_class=n_class, camera_num=6, view_num = 1)
 net.to(device)
 cudnn.benchmark = True
 print(net.count_params())
@@ -378,7 +376,7 @@ def test(epoch):
     gall_feat = np.zeros((ngall, pool_dim))
     gall_feat_att = np.zeros((ngall, pool_dim))
     with torch.no_grad():
-        for batch_idx, (input, label) in enumerate(gall_loader):
+        for batch_idx, (input, label, cam) in enumerate(gall_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
             feat, feat_att = net(input, input, modal=test_mode[0])
@@ -394,16 +392,21 @@ def test(epoch):
     ptr = 0
     query_feat = np.zeros((nquery, pool_dim))
     query_feat_att = np.zeros((nquery, pool_dim))
+    time_inference = 0
     with torch.no_grad():
-        for batch_idx, (input, label) in enumerate(query_loader):
+        for batch_idx, (input, label, cam) in enumerate(query_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
+            start1 = time.time()
             feat, feat_att = net(input, input, modal=test_mode[1])
+            time_inference += (time.time() - start1)
+            #print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
+
             query_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
             query_feat_att[ptr:ptr + batch_num, :] = feat_att.detach().cpu().numpy()
             ptr = ptr + batch_num
-    print('Extracting Time:\t {:.3f}'.format(time.time() - start))
-
+    print('Extracting Time:\t {:.3f}'.format(time_inference))
+    #exit(0)
     start = time.time()
     # compute the similarity
     distmat = np.matmul(query_feat, np.transpose(gall_feat))
@@ -449,7 +452,7 @@ for epoch in range(start_epoch, 82):
                                   sampler=sampler, num_workers=args.workers, drop_last=True)
 
     # training
-    train(epoch)
+    #train(epoch)
 
     if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))
