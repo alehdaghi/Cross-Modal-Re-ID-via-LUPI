@@ -217,33 +217,24 @@ class HybridEmbed(nn.Module):
         img_size = to_2tuple(img_size)
         self.img_size = img_size
         self.backbone = backbone
-        if feature_size is None:
-            with torch.no_grad():
-                # FIXME this is hacky, but most reliable way of determining the exact dim of the output feature
-                # map for all networks, the feature metadata has reliable channel and stride info, but using
-                # stride to calc feature dim requires info about padding of each stage that isn't captured.
-                training = backbone.training
-                if training:
-                    backbone.eval()
-                o = self.backbone(torch.zeros(1, in_chans, img_size[0], img_size[1]))
-                if isinstance(o, (list, tuple)):
-                    o = o[-1]  # last feature if backbone outputs list/tuple of features
-                feature_size = o.shape[-2:]
-                feature_dim = o.shape[1]
-                backbone.train(training)
-        else:
-            feature_size = to_2tuple(feature_size)
-            if hasattr(self.backbone, 'feature_info'):
-                feature_dim = self.backbone.feature_info.channels()[-1]
-            else:
-                feature_dim = self.backbone.num_features
-        self.num_patches = feature_size[0] * feature_size[1]
+        self.p1 = 3
+        self.p2 = 2
+        self.avgpool1 = nn.AdaptiveAvgPool2d((self.p1, 1))
+        self.avgpool2 = nn.AdaptiveAvgPool2d((self.p1, self.p2))
+
+
+
+
+
+        feature_dim = self.backbone.pool_dim
+        self.num_patches = self.p1 + self.p1 * self.p2
         self.proj = nn.Conv2d(feature_dim, embed_dim, 1)
 
-    def forward(self, x):
-        x = self.backbone(x)
+    def forward(self, x1, x2, modal=0):
+        x = self.backbone(x1, x2, modal=modal, with_feature=True)
         if isinstance(x, (list, tuple)):
             x = x[-1]  # last feature if backbone outputs list/tuple of features
+        x = torch.cat((self.avgpool1(x), self.avgpool2(x)), -1)
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
 
@@ -288,6 +279,27 @@ class PatchEmbed_overlap(nn.Module):
         return x
 
 
+class Resnet_ParchEmbed(nn.Module):
+    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
+        super().__init__()
+        img_size = to_2tuple(img_size)
+        patch_size = to_2tuple(patch_size)
+        num_patches = (img_size[1] // patch_size[1]) * (img_size[0] // patch_size[0])
+        self.img_size = img_size
+        self.patch_size = patch_size
+        self.num_patches = num_patches
+
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        # FIXME look at relaxing size constraints
+        assert H == self.img_size[0] and W == self.img_size[1], \
+            f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+        x = self.proj(x).flatten(2).transpose(1, 2)
+        return x
+
+
 class TransReID(nn.Module):
     """ Transformer-based Object Re-Identification
     """
@@ -298,11 +310,12 @@ class TransReID(nn.Module):
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.local_feature = local_feature
+        self.same_patch = False
         if hybrid_backbone is not None:
+            self.same_patch = True
             self.patch_embed = HybridEmbed(
                 hybrid_backbone, img_size=img_size, in_chans=in_chans, embed_dim=embed_dim)
-            self.patch_embed_IR = HybridEmbed(
-                hybrid_backbone, img_size=img_size, in_chans=in_chans, embed_dim=embed_dim)
+            self.patch_embed_IR = None
         else:
             self.patch_embed = PatchEmbed_overlap(
                 img_size=img_size, patch_size=patch_size, stride_size=stride_size, in_chans=in_chans,
@@ -379,20 +392,18 @@ class TransReID(nn.Module):
         self.fc = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
     def forward_features(self, x1, x2, camera_id, view_id, modal=0):
-        B = 0
-
-        if modal == 0:
+        if self.same_patch:
+            x = self.patch_embed(x1, x2, modal=modal)
+        elif modal == 0:
             x1 = self.patch_embed(x1)
             x2 = self.patch_embed_IR(x2)
             x = torch.cat((x1, x2), 0)
-            B = x1.shape[0]+x2.shape[0]
         elif modal == 1:
             x = self.patch_embed(x1)
-            B = x1.shape[0]
         elif modal == 2:
-            B = x2.shape[0]
             x = self.patch_embed_IR(x2)
 
+        B = x.shape[0]
         cls_tokens = self.cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
         x = torch.cat((cls_tokens, x), dim=1)
 
@@ -492,6 +503,16 @@ def deit_small_patch16_224_TransReID(img_size=(256, 128), stride_size=16, drop_p
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
 
     return model
+
+def vit_our(img_size=(288, 144), stride_size=16, drop_path_rate=0.1, drop_rate=0.0, attn_drop_rate=0.0, camera=0,
+            view=0, local_feature=False, sie_xishu=1.5, hybrid_backbone=None, **kwargs, ):
+    model = TransReID(
+        img_size=img_size, hybrid_backbone=hybrid_backbone, patch_size=16, stride_size=stride_size, embed_dim=768, depth=8, num_heads=8, mlp_ratio=3, qkv_bias=True,\
+        camera=camera, view=view, drop_path_rate=drop_path_rate, drop_rate=drop_rate, attn_drop_rate=attn_drop_rate,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),  sie_xishu=sie_xishu, local_feature=local_feature, **kwargs)
+
+    return model
+
 
 
 def _no_grad_trunc_normal_(tensor, mean, std, a, b):

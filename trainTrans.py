@@ -44,7 +44,7 @@ parser.add_argument('--img_h', default=288, type=int,
                     metavar='imgh', help='img height')
 parser.add_argument('--batch-size', default=8, type=int,
                     metavar='B', help='training batch size')
-parser.add_argument('--test-batch', default=8, type=int,
+parser.add_argument('--test-batch', default=32, type=int,
                     metavar='tb', help='testing batch size')
 parser.add_argument('--method', default='agw', type=str,
                     metavar='m', help='method type: base or agw')
@@ -151,7 +151,7 @@ if dataset == 'sysu':
 
     # testing set
     query_img, query_label, query_cam = process_query_sysu(data_path, mode=args.mode)
-    gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0)
+    gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0, single_shot=True)
 
 elif dataset == 'regdb':
     # training set
@@ -188,7 +188,11 @@ print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
 print('==> Building model..')
 
-net = make_model( num_class=n_class, camera_num=6, view_num = 1)
+patch_net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch='resnet18')
+checkpoint = torch.load("save_model/sysu_base_p8_n16_lr_0.1_seed_0_gray_share_arch18_best.t")
+patch_net.load_state_dict(checkpoint['net'])
+
+net = make_model( num_class=n_class, camera_num=6, view_num = 1, hybrid_backbone=patch_net)
 net.to(device)
 cudnn.benchmark = True
 print(net.count_params())
@@ -372,14 +376,19 @@ def test(epoch):
     start = time.time()
     ptr = 0
     query_feat = np.zeros((nquery, pool_dim))
+    time_inference = 0
     with torch.no_grad():
         for batch_idx, (input, label, cam) in enumerate(query_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
+            start1 = time.time()
             feat = net(input, input, modal=test_mode[1], cam_label=cam)
+            time_inference += (time.time() - start1)
+            print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
             query_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
             ptr = ptr + batch_num
-    print('Extracting Time:\t {:.3f}'.format(time.time() - start))
+    print('Extracting Time:\t {:.3f}'.format(time_inference))
+    exit(0)
 
     start = time.time()
     # compute the similarity
@@ -420,7 +429,7 @@ for epoch in range(start_epoch, 82):
                                   sampler=sampler, num_workers=args.workers, drop_last=True)
 
     # training
-    #train(epoch)
+    train(epoch)
 
     if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))

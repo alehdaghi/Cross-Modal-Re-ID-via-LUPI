@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from resnet import ResNet, Bottleneck
 import copy
-from .vit_pytorch import vit_base_patch16_224_TransReID, vit_small_patch16_224_TransReID, deit_small_patch16_224_TransReID
+from .vit_pytorch import vit_base_patch16_224_TransReID, vit_small_patch16_224_TransReID, deit_small_patch16_224_TransReID, vit_our
 from losses.metric_learning import Arcface, Cosface, AMSoftmax, CircleLoss
 
 def shuffle_unit(features, shift, group, begin=1):
@@ -213,10 +213,10 @@ class build_transformer(nn.Module):
 
 
 class build_transformer_local(nn.Module):
-    def __init__(self, num_classes, camera_num, view_num, cfg, factory, rearrange):
+    def __init__(self, num_classes, camera_num, view_num, cfg, factory, rearrange, hybrid_backbone=None):
         super(build_transformer_local, self).__init__()
         model_path = cfg.MODEL.PRETRAIN_PATH
-        pretrain_choice = cfg.MODEL.PRETRAIN_CHOICE
+        pretrain_choice = "none"#cfg.MODEL.PRETRAIN_CHOICE
         self.cos_layer = cfg.MODEL.COS_LAYER
         self.neck = cfg.MODEL.NECK
         self.neck_feat = cfg.TEST.NECK_FEAT
@@ -231,7 +231,9 @@ class build_transformer_local(nn.Module):
 
         view_num = 0
 
-        self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN, sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH)
+        self.base = factory[cfg.MODEL.TRANSFORMER_TYPE](img_size=cfg.INPUT.SIZE_TRAIN,
+                                                        hybrid_backbone=hybrid_backbone,
+                                                        sie_xishu=cfg.MODEL.SIE_COE, local_feature=cfg.MODEL.JPM, camera=camera_num, view=view_num, stride_size=cfg.MODEL.STRIDE_SIZE, drop_path_rate=cfg.MODEL.DROP_PATH)
 
         if pretrain_choice == 'imagenet':
             self.base.load_param(model_path)
@@ -373,7 +375,8 @@ __factory_T_type = {
     'vit_base_patch16_224_TransReID': vit_base_patch16_224_TransReID,
     'deit_base_patch16_224_TransReID': vit_base_patch16_224_TransReID,
     'vit_small_patch16_224_TransReID': vit_small_patch16_224_TransReID,
-    'deit_small_patch16_224_TransReID': deit_small_patch16_224_TransReID
+    'deit_small_patch16_224_TransReID': deit_small_patch16_224_TransReID,
+    'vit_our': vit_our
 }
 
 def make_cfg():
@@ -393,7 +396,7 @@ def make_cfg():
     cfg.MODEL.NAME= 'transformer'
     cfg.MODEL.NO_MARGIN= True
     cfg.MODEL.DEVICE_ID= ('5')
-    cfg.MODEL.TRANSFORMER_TYPE= 'vit_base_patch16_224_TransReID'
+    cfg.MODEL.TRANSFORMER_TYPE= 'vit_our'
     cfg.MODEL.STRIDE_SIZE= [12, 12]
     cfg.MODEL.SIE_CAMERA= True
     cfg.MODEL.SIE_COE= 3.0
@@ -447,9 +450,9 @@ def make_cfg():
     return cfg
 
 
-def make_model(num_class, camera_num, view_num):
+def make_model(num_class, camera_num, view_num, hybrid_backbone=None):
     cfg = make_cfg()
-    model = build_transformer_local(num_class, camera_num, view_num, cfg, __factory_T_type, rearrange=True)
+    model = build_transformer_local(num_class, camera_num, view_num, cfg, __factory_T_type, rearrange=True, hybrid_backbone=hybrid_backbone)
     print('===========building transformer with JPM module ===========')
     return model
 

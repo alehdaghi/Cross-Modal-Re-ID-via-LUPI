@@ -281,12 +281,16 @@ class embed_net(nn.Module):
 
         feat = self.bottleneck(x_pool)
 
-        if self.training:
-            return x_pool, self.classifier(feat)
-        elif with_feature:
-            return self.l2norm(x_pool), self.l2norm(feat), x
-        else:
-            return self.l2norm(x_pool), self.l2norm(feat)
+        retX_pool = x_pool
+        retFeat = self.classifier(feat)
+
+        if ~self.training:
+            retX_pool = self.l2norm(x_pool)
+            retFeat = self.l2norm(feat)
+
+        if with_feature:
+            return retX_pool, retFeat, x
+        return retX_pool, retFeat
 
     def getPoolDim(self):
         return self.pool_dim
