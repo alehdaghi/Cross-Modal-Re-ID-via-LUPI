@@ -507,7 +507,7 @@ def deit_small_patch16_224_TransReID(img_size=(256, 128), stride_size=16, drop_p
 def vit_our(img_size=(288, 144), stride_size=16, drop_path_rate=0.1, drop_rate=0.0, attn_drop_rate=0.0, camera=0,
             view=0, local_feature=False, sie_xishu=1.5, hybrid_backbone=None, **kwargs, ):
     model = TransReID(
-        img_size=img_size, hybrid_backbone=hybrid_backbone, patch_size=16, stride_size=stride_size, embed_dim=768, depth=8, num_heads=8, mlp_ratio=3, qkv_bias=True,\
+        img_size=img_size, hybrid_backbone=hybrid_backbone, patch_size=16, stride_size=stride_size, embed_dim=768, depth=10, num_heads=8, mlp_ratio=3, qkv_bias=True,\
         camera=camera, view=view, drop_path_rate=drop_path_rate, drop_rate=drop_rate, attn_drop_rate=attn_drop_rate,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),  sie_xishu=sie_xishu, local_feature=local_feature, **kwargs)
 
