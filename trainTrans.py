@@ -189,7 +189,7 @@ print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 print('==> Building model..')
 
 patch_net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch='resnet18')
-checkpoint = torch.load("save_model/sysu_base_p8_n16_lr_0.1_seed_0_gray_share_arch18_best.t")
+checkpoint = torch.load("save_model/sysu_base_p8_n16_lr_0.1_seed_0_gray_arch18_best.t")
 patch_net.load_state_dict(checkpoint['net'])
 
 net = make_model( num_class=n_class, camera_num=6, view_num = 1, hybrid_backbone=patch_net)
