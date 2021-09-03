@@ -385,11 +385,11 @@ def test(epoch):
             start1 = time.time()
             feat = net(input, input, modal=test_mode[1], cam_label=cam)
             time_inference += (time.time() - start1)
-            print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
+            #print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
             query_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
             ptr = ptr + batch_num
     print('Extracting Time:\t {:.3f}'.format(time_inference))
-    exit(0)
+    #exit(0)
 
     start = time.time()
     # compute the similarity
