@@ -217,8 +217,8 @@ class HybridEmbed(nn.Module):
         img_size = to_2tuple(img_size)
         self.img_size = img_size
         self.backbone = backbone
-        self.p1 = 3
-        self.p2 = 2
+        self.p1 = 5
+        self.p2 = 3
         self.avgpool1 = nn.AdaptiveAvgPool2d((self.p1, 1))
         self.avgpool2 = nn.AdaptiveAvgPool2d((self.p1, self.p2))
 
