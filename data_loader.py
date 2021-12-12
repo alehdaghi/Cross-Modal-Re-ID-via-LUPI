@@ -28,18 +28,19 @@ class SYSUData(data.Dataset):
 
         img1,  target1, cam1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]], self.train_color_cam[self.cIndex[index]]
         img2,  target2, cam2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]], self.train_thermal_cam[self.tIndex[index]]
-        img3 = None
+        img3, target3 = -1, -1
         if self.returnsGray:
             img3 = self.rgb2gray(img1)
             img3 = self.transform(np.stack((img3,)*3, axis=-1))
+            target3 = target1
 
         img1 = self.transform(img1)
         img2 = self.transform(img2)
 
-        if self.returnsGray:
-            return img1, img2, img3, target1, target2, target1
-        else:
-            return img1, img2, target1, target2, cam1-1, cam2-1
+        #if self.returnsGray:
+        return img1, img2, img3, target1, target2, target3
+        #else:
+        #    return img1, img2, img3, target1, target2, None#cam1-1, cam2-1
 
     def __len__(self):
         return len(self.train_color_label)
