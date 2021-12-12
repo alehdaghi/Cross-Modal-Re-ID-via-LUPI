@@ -452,7 +452,7 @@ for epoch in range(start_epoch, 82):
                                   sampler=sampler, num_workers=args.workers, drop_last=True)
 
     # training
-    #train(epoch)
+    train(epoch)
 
     if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))
