@@ -284,7 +284,7 @@ class embed_net(nn.Module):
         retX_pool = x_pool
         retFeat = self.classifier(feat)
 
-        if ~self.training:
+        if not self.training :
             retX_pool = self.l2norm(x_pool)
             retFeat = self.l2norm(feat)
 
