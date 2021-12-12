@@ -319,15 +319,15 @@ def train(epoch):
 
         loss_id = criterion_id(out0, labels)
         #loss_tri, batch_acc = criterion_tri(feat, labels)
-        loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
-        l1, _ = hctriplet(feat, labels)
+        #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
+        #l1, _ = hctriplet(feat, labels)
 
 
         #correct += (batch_acc / 2)
         _, predicted = out0.max(1)
         correct += (predicted.eq(labels).sum().item() / 2)
 
-        loss = loss_id + loss_tri + loss_color2gray + loss_center
+        loss = loss_id + loss_tri + loss_color2gray #+ loss_center
 
         optimizer.zero_grad()
         loss.backward()
@@ -338,7 +338,7 @@ def train(epoch):
         id_loss.update(loss_id.item(), 2 * input1.size(0))
         tri_loss.update(loss_tri.item(), 2 * input1.size(0))
         gray_loss.update(loss_color2gray.item(), 2 * input1.size(0))
-        center_loss.update(loss_center.item(), 2 * input1.size(0))
+        #center_loss.update(loss_center.item(), 2 * input1.size(0))
         total += labels.size(0)
 
         # measure elapsed time

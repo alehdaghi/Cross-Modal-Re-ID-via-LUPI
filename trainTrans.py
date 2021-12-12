@@ -44,7 +44,7 @@ parser.add_argument('--img_h', default=288, type=int,
                     metavar='imgh', help='img height')
 parser.add_argument('--batch-size', default=8, type=int,
                     metavar='B', help='training batch size')
-parser.add_argument('--test-batch', default=32, type=int,
+parser.add_argument('--test-batch', default=24, type=int,
                     metavar='tb', help='testing batch size')
 parser.add_argument('--method', default='agw', type=str,
                     metavar='m', help='method type: base or agw')
@@ -151,7 +151,7 @@ if dataset == 'sysu':
 
     # testing set
     query_img, query_label, query_cam = process_query_sysu(data_path, mode=args.mode)
-    gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0, single_shot=True)
+    gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0, single_shot=False)
 
 elif dataset == 'regdb':
     # training set
@@ -366,8 +366,11 @@ def test(epoch):
         for batch_idx, (input, label, cam) in enumerate(gall_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
+            start1 = time.time()
             feat = net(input, input, modal=test_mode[0], cam_label=cam)
-            gall_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
+            f = feat.detach().cpu().numpy()
+            print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
+            gall_feat[ptr:ptr + batch_num, :] = f
             ptr = ptr + batch_num
     print('Extracting Time:\t {:.3f}'.format(time.time() - start))
 
@@ -385,8 +388,9 @@ def test(epoch):
             start1 = time.time()
             feat = net(input, input, modal=test_mode[1], cam_label=cam)
             time_inference += (time.time() - start1)
-            #print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
-            query_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
+            f = feat.detach().cpu().numpy()
+            print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
+            query_feat[ptr:ptr + batch_num, :] = f
             ptr = ptr + batch_num
     print('Extracting Time:\t {:.3f}'.format(time_inference))
     #exit(0)
@@ -430,7 +434,7 @@ for epoch in range(start_epoch, 82):
                                   sampler=sampler, num_workers=args.workers, drop_last=True)
 
     # training
-    train(epoch)
+    #train(epoch)
 
     if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))

@@ -64,7 +64,7 @@ class Explanation_generator:
 
 
         # path to load the pretrained model
-        resume = './save_model/sysu_base_p4_n10_lr_0.1_seed_0_arch50_epoch_80.t'
+        resume = './save_model/sysu_base_p4_n10_lr_0.1_seed_0_gray_epoch_80.t'
         #resume = './save_model/sysu_base_p4_n8_lr_0.1_seed_0_first.t'
         checkpoint = torch.load(resume)
 
@@ -202,8 +202,8 @@ class Explanation_generator:
                          decom_padding[x_max, y_max]*dx*dy
         return np.maximum(interplolation,0)
 
-    def demo(self, path_1='../Datasets/SYSU-MM01/cam1/0006/0012.jpg', \
-                   path_2='../Datasets/SYSU-MM01/cam6/0006/0012.jpg', \
+    def demo(self, path_1='../Datasets/SYSU-MM01/cam1/0070/0011.jpg', \
+                   path_2='../Datasets/SYSU-MM01/cam6/0070/0011.jpg', \
                    size = (img_w, img_h)):
         '''
             generate activation map with different methods.
