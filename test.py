@@ -9,7 +9,7 @@ import torchvision.transforms as transforms
 from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
-from modelOrig import embed_net
+from model import embed_net
 from utils import *
 import pdb
 
@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
 parser.add_argument('--dataset', default='sysu', help='dataset name: regdb or sysu]')
 parser.add_argument('--lr', default=0.1 , type=float, help='learning rate, 0.00035 for adam')
 parser.add_argument('--optim', default='sgd', type=str, help='optimizer')
-parser.add_argument('--arch', default='resnet50', type=str,
+parser.add_argument('--arch', '-a', default='resnet50', type=str,
                     help='network baseline: resnet50')
 parser.add_argument('--resume', '-r', default='', type=str,
                     help='resume from checkpoint')
@@ -77,7 +77,9 @@ if args.method =='base':
     # print(net.count_params())
 else:
     net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
-pool_dim = 2048#net.getPoolDim()
+pool_dim = 2048 #net.getPoolDim()
+if args.arch == 'resnet18':
+    pool_dim = 512
 print(net.thermal_module.count_params())
 net.to(device)    
 cudnn.benchmark = True
@@ -118,7 +120,7 @@ def extract_gall_feat(gall_loader):
     gall_feat_pool = np.zeros((ngall, pool_dim))
     gall_feat_fc = np.zeros((ngall, pool_dim))
     with torch.no_grad():
-        for batch_idx, (input, label ) in enumerate(gall_loader):
+        for batch_idx, (input, label, cam) in enumerate(gall_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
             feat_pool, feat_fc = net(input, input, modal=test_mode[0])
@@ -136,7 +138,7 @@ def extract_query_feat(query_loader):
     query_feat_pool = np.zeros((nquery, pool_dim))
     query_feat_fc = np.zeros((nquery, pool_dim))
     with torch.no_grad():
-        for batch_idx, (input, label ) in enumerate(query_loader):
+        for batch_idx, (input, label, cam ) in enumerate(query_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
             feat_pool, feat_fc = net(input, input, modal=test_mode[1])
@@ -156,7 +158,7 @@ if dataset == 'sysu':
         if os.path.isfile(model_path):
             print('==> loading checkpoint {}'.format(args.resume))
             checkpoint = torch.load(model_path)
-            # net.load_state_dict(checkpoint['net'])
+            net.load_state_dict(checkpoint['net'])
             print('==> loaded checkpoint {} (epoch {})'
                   .format(args.resume, checkpoint['epoch']))
         else:
@@ -177,13 +179,13 @@ if dataset == 'sysu':
     print("  gallery  | {:5d} | {:8d}".format(len(np.unique(gall_label)), ngall))
     print("  ------------------------------")
 
-    queryset = TestData(query_img, query_label, transform=transform_test, img_size=(args.img_w, args.img_h))
+    queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
     query_loader = data.DataLoader(queryset, batch_size=args.test_batch, shuffle=False, num_workers=4)
     print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
     query_feat_pool, query_feat_fc = extract_query_feat(query_loader)
     for trial in range(10):
-        trial_gallset = TestData(gall_img, gall_label, transform=transform_test, img_size=(args.img_w, args.img_h))
+        trial_gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
         trial_gall_loader = data.DataLoader(trial_gallset, batch_size=args.test_batch, shuffle=False, num_workers=4)
 
         gall_feat_pool, gall_feat_fc = extract_gall_feat(trial_gall_loader)
@@ -224,7 +226,7 @@ if dataset == 'sysu':
             'POOL: Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
                 cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
         gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=trial)
-
+        exit(0)
 
 elif dataset == 'regdb':
 
@@ -300,6 +302,7 @@ elif dataset == 'regdb':
         print(
             'POOL:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
                 cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
+
 
 cmc = all_cmc / 10
 mAP = all_mAP / 10

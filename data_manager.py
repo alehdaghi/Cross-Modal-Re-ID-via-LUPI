@@ -8,7 +8,11 @@ def process_query_sysu(data_path, mode = 'all', relabel=False, file_path='exp/te
         ir_cameras = ['cam3','cam6']
     elif mode =='indoor':
         ir_cameras = ['cam3','cam6']
-    
+    elif mode == 'Vis': #test unimodal training
+        ir_cameras = ['cam1', 'cam4']
+    elif mode == 'Ir':
+        ir_cameras = ['cam3']
+
     file_path = os.path.join(data_path,file_path)
     files_rgb = []
     files_ir = []
@@ -42,6 +46,10 @@ def process_gallery_sysu(data_path, mode = 'all', trial = 0, single_shot=True,  
         rgb_cameras = ['cam1','cam2','cam4','cam5']
     elif mode =='indoor':
         rgb_cameras = ['cam1','cam2']
+    elif mode == 'Vis': #test unimodal training
+        rgb_cameras = ['cam2', 'cam5']
+    elif mode == 'Ir':
+        rgb_cameras = ['cam6']
         
     file_path = os.path.join(data_path,file_path)
     files_rgb = []

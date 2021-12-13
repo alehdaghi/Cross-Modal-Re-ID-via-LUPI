@@ -57,6 +57,8 @@ parser.add_argument('--seed', default=0, type=int,
                     metavar='t', help='random seed')
 parser.add_argument('--gpu', default='0', type=str,
                     help='gpu device ids for CUDA_VISIBLE_DEVICES')
+parser.add_argument('--uni', default=0, type=int,
+                    help='0: two modality, 1: Only Vis 2: Only Ir 3: Only Gray used in training')
 parser.add_argument('--mode', default='all', type=str, help='all or indoor')
 parser.add_argument('--use_gray', dest='use_gray', help='use gray as 3rd modality', action='store_true')
 parser.add_argument('--separate_batch_norm', dest='separate_batch_norm', help='separate batch norm layers only in first layers',
@@ -149,6 +151,10 @@ if dataset == 'sysu':
     color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_thermal_label)
 
     # testing set
+    if args.uni == 1:
+        args.mode = 'Vis'
+    elif args.uni == 2:
+        args.mode = 'Ir'
     query_img, query_label, query_cam = process_query_sysu(data_path, mode=args.mode)
     gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0)
 
@@ -279,22 +285,24 @@ def train(epoch):
 
     for batch_idx, (input1, input2, input3, label1, label2, _) in enumerate(trainloader):
 
-
-
+        bs = label1.shape[0]
         input1 = Variable(input1.cuda())
         input2 = Variable(input2.cuda())
         if args.use_gray:
             labels = torch.cat((label1, label2, label1), 0)
             input3 = Variable(input3.cuda())
         else:
-            labels = torch.cat((label1, label2), 0)
+            if args.uni == 0:
+                labels = torch.cat((label1, label2), 0)
+            else:
+                labels = label1
             input3 = None
 
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
 
+        feat, out0, = net(input1, input2, x3=input3, modal=args.uni)
 
-        feat, out0, = net(input1, input2, x3=input3)
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
             color_feat, thermal_feat, gray_feat = torch.split(feat, label1.shape[0])
@@ -309,8 +317,12 @@ def train(epoch):
             loss_color2gray = reconst_loss(color_feat, gray_feat)
 
         else:
-            color_feat, thermal_feat = torch.split(feat, label1.shape[0])
-            color_label, thermal_label = torch.split(labels, label1.shape[0])
+            if args.uni != 0:
+                color_feat, thermal_feat = feat, feat
+                color_label, thermal_label = labels, labels
+            else:
+                color_feat, thermal_feat = torch.split(feat, bs)
+                color_label, thermal_label = torch.split(labels, bs)
             loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, thermal_feat,
                                                      color_label, thermal_label, thermal_label)
             loss_tri_thermal = cross_triplet_creiteron(thermal_feat, color_feat, color_feat,
