@@ -107,13 +107,16 @@ class RegDBData(data.Dataset):
 
 
 class TestData(data.Dataset):
-    def __init__(self, test_img_file, test_label, test_cam, transform=None, img_size = (144,288)):
+    def __init__(self, test_img_file, test_label, test_cam, transform=None, img_size = (144,288), colorToGray=False):
 
         test_image = []
         for i in range(len(test_img_file)):
             img = Image.open(test_img_file[i])
             img = img.resize((img_size[0], img_size[1]), Image.ANTIALIAS)
             pix_array = np.array(img)
+            if colorToGray:
+                pix_array = np.dot(pix_array[..., :3], [0.299, 0.587, 0.144]).astype(pix_array.dtype)
+                pix_array = np.stack((pix_array,)*3, axis=-1)
             test_image.append(pix_array)
         test_image = np.array(test_image)
         self.test_image = test_image

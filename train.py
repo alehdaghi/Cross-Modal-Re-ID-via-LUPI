@@ -74,7 +74,10 @@ dataset = args.dataset
 if dataset == 'sysu':
     data_path = '../Datasets/SYSU-MM01/'
     log_path = args.log_path + 'sysu_log/'
-    test_mode = [1, 2]  # thermal to visible
+    if args.uni == 0:
+        test_mode = [1, 2]  # thermal to visible
+    else:
+        test_mode = [args.uni, args.uni]  # thermal to visible
 elif dataset == 'regdb':
     data_path = '../Datasets/RegDB/'
     log_path = args.log_path + 'regdb_log/'
@@ -146,7 +149,7 @@ transform_test = transforms.Compose([
 end = time.time()
 if dataset == 'sysu':
     # training set
-    trainset = SYSUData(data_path, transform=transform_train)
+    trainset = SYSUData(data_path, transform=transform_train, gray=(args.use_gray or args.uni == 3))
     # generate the idx of each person identity
     color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_thermal_label)
 
@@ -155,6 +158,8 @@ if dataset == 'sysu':
         args.mode = 'Vis'
     elif args.uni == 2:
         args.mode = 'Ir'
+    elif args.uni == 3:
+        args.mode = 'Gray'
     query_img, query_label, query_cam = process_query_sysu(data_path, mode=args.mode)
     gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0)
 
@@ -168,8 +173,8 @@ elif dataset == 'regdb':
     query_img, query_label = process_test_regdb(data_path, trial=args.trial, modal='visible')
     gall_img, gall_label = process_test_regdb(data_path, trial=args.trial, modal='thermal')
 
-gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
-queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
+gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray= args.uni == 3)
+queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray= args.uni == 3)
 
 # testing data loader
 gall_loader = data.DataLoader(gallset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
@@ -288,15 +293,17 @@ def train(epoch):
         bs = label1.shape[0]
         input1 = Variable(input1.cuda())
         input2 = Variable(input2.cuda())
-        if args.use_gray:
+        if args.use_gray or args.uni == 3:
             labels = torch.cat((label1, label2, label1), 0)
             input3 = Variable(input3.cuda())
         else:
-            if args.uni == 0:
-                labels = torch.cat((label1, label2), 0)
-            else:
-                labels = label1
             input3 = None
+            labels = torch.cat((label1, label2), 0)
+
+        if args.uni == 1 or args.uni == 3:
+            labels = label1
+        elif args.uni == 2:
+            labels = label2
 
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
@@ -464,7 +471,7 @@ for epoch in range(start_epoch, 82):
                                   sampler=sampler, num_workers=args.workers, drop_last=True)
 
     # training
-    train(epoch)
+    #train(epoch)
 
     if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))

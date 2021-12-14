@@ -38,7 +38,7 @@ parser.add_argument('--img_h', default=288, type=int,
                     metavar='imgh', help='img height')
 parser.add_argument('--batch-size', default=8, type=int,
                     metavar='B', help='training batch size')
-parser.add_argument('--test-batch', default=32, type=int,
+parser.add_argument('--test-batch', default=30, type=int,
                     metavar='tb', help='testing batch size')
 parser.add_argument('--method', default='base', type=str,
                     metavar='m', help='method type: base or awg')
@@ -52,6 +52,8 @@ parser.add_argument('--seed', default=0, type=int,
                     metavar='t', help='random seed')
 parser.add_argument('--gpu', default='0', type=str,
                     help='gpu device ids for CUDA_VISIBLE_DEVICES')
+parser.add_argument('--uni', default=0, type=int,
+                    help='0: two modality, 1: Only Vis 2: Only Ir 3: Only Gray used in training')
 parser.add_argument('--mode', default='all', type=str, help='all or indoor for sysu')
 parser.add_argument('--tvsearch', action='store_true', help='whether thermal to visible search on RegDB')
 args = parser.parse_args()
@@ -61,7 +63,11 @@ dataset = args.dataset
 if dataset == 'sysu':
     data_path = '../Datasets/SYSU-MM01/'
     n_class = 296
-    test_mode = [1, 2]
+    if args.uni == 0:
+        test_mode = [1, 2]  # thermal to visible
+    else:
+        test_mode = [2, 2]  # thermal to visible
+
 elif dataset =='regdb':
     data_path = '../Datasets/RegDB/'
     n_class = 206
@@ -165,6 +171,12 @@ if dataset == 'sysu':
             print('==> no checkpoint found at {}'.format(args.resume))
 
     # testing set
+    if args.uni == 1:
+        args.mode = 'Vis'
+    elif args.uni == 2:
+        args.mode = 'Ir'
+    elif args.uni == 3:
+        args.mode = 'Gray'
     query_img, query_label, query_cam = process_query_sysu(data_path, mode=args.mode)
     gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode,
                                                           trial=0,  single_shot=False)
@@ -179,13 +191,13 @@ if dataset == 'sysu':
     print("  gallery  | {:5d} | {:8d}".format(len(np.unique(gall_label)), ngall))
     print("  ------------------------------")
 
-    queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
+    queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray=args.uni == 3)
     query_loader = data.DataLoader(queryset, batch_size=args.test_batch, shuffle=False, num_workers=4)
     print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
     query_feat_pool, query_feat_fc = extract_query_feat(query_loader)
     for trial in range(10):
-        trial_gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
+        trial_gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray=args.uni == 3)
         trial_gall_loader = data.DataLoader(trial_gallset, batch_size=args.test_batch, shuffle=False, num_workers=4)
 
         gall_feat_pool, gall_feat_fc = extract_gall_feat(trial_gall_loader)
@@ -225,8 +237,9 @@ if dataset == 'sysu':
         print(
             'POOL: Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
                 cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
-        gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=trial)
         exit(0)
+        gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=trial)
+
 
 elif dataset == 'regdb':
 
