@@ -129,7 +129,7 @@ def extract_gall_feat(gall_loader):
         for batch_idx, (input, label, cam) in enumerate(gall_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
-            feat_pool, feat_fc = net(input, input, modal=test_mode[0])
+            feat_pool, feat_fc = net(input, input, x3=input, modal=test_mode[0])
             gall_feat_pool[ptr:ptr+batch_num,: ] = feat_pool.detach().cpu().numpy()
             gall_feat_fc[ptr:ptr+batch_num,: ]   = feat_fc.detach().cpu().numpy()
             ptr = ptr + batch_num
@@ -147,7 +147,7 @@ def extract_query_feat(query_loader):
         for batch_idx, (input, label, cam ) in enumerate(query_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
-            feat_pool, feat_fc = net(input, input, modal=test_mode[1])
+            feat_pool, feat_fc = net(input, input, x3=input, modal=test_mode[1])
             query_feat_pool[ptr:ptr+batch_num,: ] = feat_pool.detach().cpu().numpy()
             query_feat_fc[ptr:ptr+batch_num,: ]   = feat_fc.detach().cpu().numpy()
             ptr = ptr + batch_num         

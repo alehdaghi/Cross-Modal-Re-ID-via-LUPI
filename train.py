@@ -398,7 +398,7 @@ def test(epoch):
         for batch_idx, (input, label, cam) in enumerate(gall_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
-            feat, feat_att = net(input, input, modal=test_mode[0])
+            feat, feat_att = net(input, input, x3=input, modal=test_mode[0])
             gall_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
             gall_feat_att[ptr:ptr + batch_num, :] = feat_att.detach().cpu().numpy()
             ptr = ptr + batch_num
@@ -417,7 +417,7 @@ def test(epoch):
             batch_num = input.size(0)
             input = Variable(input.cuda())
             start1 = time.time()
-            feat, feat_att = net(input, input, modal=test_mode[1])
+            feat, feat_att = net(input, input, x3=input, modal=test_mode[1])
             time_inference += (time.time() - start1)
             #print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
 
