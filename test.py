@@ -38,7 +38,7 @@ parser.add_argument('--img_h', default=288, type=int,
                     metavar='imgh', help='img height')
 parser.add_argument('--batch-size', default=8, type=int,
                     metavar='B', help='training batch size')
-parser.add_argument('--test-batch', default=30, type=int,
+parser.add_argument('--test-batch', default=28, type=int,
                     metavar='tb', help='testing batch size')
 parser.add_argument('--method', default='base', type=str,
                     metavar='m', help='method type: base or awg')
@@ -66,7 +66,7 @@ if dataset == 'sysu':
     if args.uni == 0:
         test_mode = [1, 2]  # thermal to visible
     else:
-        test_mode = [2, 2]  # thermal to visible
+        test_mode = [3, 3]  # thermal to visible
 
 elif dataset =='regdb':
     data_path = '../Datasets/RegDB/'

@@ -14,6 +14,7 @@ from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
+from sup_con_loss import SupConLoss
 from utils import *
 from loss import *
 from tensorboardX import SummaryWriter
@@ -63,8 +64,10 @@ parser.add_argument('--mode', default='all', type=str, help='all or indoor')
 parser.add_argument('--use_gray', dest='use_gray', help='use gray as 3rd modality', action='store_true')
 parser.add_argument('--separate_batch_norm', dest='separate_batch_norm', help='separate batch norm layers only in first layers',
                     action='store_true')
+parser.add_argument('--cont', dest='cont_loss', help='use Contrastive Loss', action='store_true')
 parser.set_defaults(use_gray=False)
 parser.set_defaults(separate_batch_norm=False)
+parser.set_defaults(cont_loss=False)
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -239,6 +242,8 @@ criterion_tri.to(device)
 cross_triplet_creiteron.margin_loss.to(device)
 reconst_loss.to(device)
 
+criterion_contrastive = SupConLoss()
+
 if args.optim == 'sgd':
     ignored_params = list(map(id, net.bottleneck.parameters())) \
                      + list(map(id, net.classifier.parameters()))
@@ -346,7 +351,11 @@ def train(epoch):
         _, predicted = out0.max(1)
         correct += (predicted.eq(labels).sum().item() / 2)
 
-        loss = loss_id + loss_tri + loss_color2gray #+ loss_center
+        if args.cont_loss:
+            feat = torch.cat([color_feat.unsqueeze(1), thermal_feat.unsqueeze(1)], dim=1)
+            loss = criterion_contrastive(feat, labels[:bs])
+        else:
+            loss = loss_id + loss_tri + loss_color2gray #+ loss_center
 
         optimizer.zero_grad()
         loss.backward()
