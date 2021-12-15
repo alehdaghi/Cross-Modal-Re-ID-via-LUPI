@@ -357,7 +357,8 @@ def train(epoch):
 
         if args.cont_loss:
             feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
-            loss = criterion_contrastive(feat, labels[:bs])
+            loss_cont = criterion_contrastive(feat, labels[:bs])
+            loss = loss_cont + loss_id
         else:
             loss = loss_id + loss_tri + loss_color2gray #+ loss_center
 
