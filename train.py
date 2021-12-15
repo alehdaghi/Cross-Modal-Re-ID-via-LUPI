@@ -108,6 +108,10 @@ if not args.optim == 'sgd':
 if args.use_gray:
     suffix = suffix + '_gray'
 
+if args.cont_loss:
+    suffix = suffix + '_cont'
+
+
 if args.separate_batch_norm:
     suffix = suffix + '_sepBatch'
 
