@@ -488,8 +488,8 @@ for epoch in range(start_epoch, 82):
         # testing
         cmc, mAP, mINP, cmc_att, mAP_att, mINP_att = test(epoch)
         # save model
-        if cmc_att[0] > best_acc:  # not the real best for sysu-mm01
-            best_acc = cmc_att[0]
+        if max(cmc[0], cmc_att[0]) > best_acc:  # not the real best for sysu-mm01
+            best_acc = max(cmc[0], cmc_att[0])
             best_epoch = epoch
             state = {
                 'net': net.state_dict(),
