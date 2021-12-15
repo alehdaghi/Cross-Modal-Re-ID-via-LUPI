@@ -352,7 +352,7 @@ def train(epoch):
         correct += (predicted.eq(labels).sum().item() / 2)
 
         if args.cont_loss:
-            feat = torch.cat([color_feat.unsqueeze(1), thermal_feat.unsqueeze(1)], dim=1)
+            feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
             loss = criterion_contrastive(feat, labels[:bs])
         else:
             loss = loss_id + loss_tri + loss_color2gray #+ loss_center
