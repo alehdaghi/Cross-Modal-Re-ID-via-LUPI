@@ -414,7 +414,7 @@ def train_adv1(feat, z, cams):
 
     z = z.detach()
     feat = feat.detach()
-    loss_adv1 = (criterion_id(net.W2(z)[0], cams - 1) + criterion_id(net.W2(feat)[0], cams)) * 1.0  # beta
+    loss_adv1 = (criterion_id(net.W2(z)[0], cams - 1) + criterion_id(net.W2(feat)[0], cams-1)) * 1.0  # beta
     loss_adv1.backward()
     net.camClassifier_optimizer.step()
     return loss_adv1.item()
