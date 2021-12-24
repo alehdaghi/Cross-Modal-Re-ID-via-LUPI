@@ -419,7 +419,7 @@ def train_all(feat, z, labels, cams, loss_tri):
 
     pred_ids = net.W1(z)[0]
     p_l = torch.zeros_like(pred_ids) + 1/n_class
-    loss_style_id = categorical_cross_entropy(pred_ids, p_l)
+    loss_style_id = categorical_cross_entropy(pred_ids, p_l) / 6
 
     loss_cam = criterion_id(net.W2(z)[0], cams - 1)
     loss_id = criterion_id(out0, labels)
