@@ -337,11 +337,11 @@ def train(epoch):
             loss, out0 = train_pre(x_a, x_m, feat, z_a, labels, cams, loss_tri)
             net.optimizers_step()
         else:
-            train_adv1(feat, z_a, cams)
-            train_e1(feat, labels, loss_tri)
-            train_adv2(feat, z_a, labels)
-            train_e2(z_a, cams)
-
+            loss_adv1= train_adv1(feat, z_a, cams)
+            loss_e1, out0 = train_e1(feat, labels, loss_tri)
+            loss_adv2, out0 = train_adv2(feat, z_a, labels)
+            loss_e2 = train_e2(z_a, cams)
+            loss = loss_adv1 + loss_e1 + loss_adv2 + loss_e2
 
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
@@ -363,7 +363,7 @@ def train(epoch):
 
 
         # update P
-        train_loss.update(loss.item(), 2 * input1.size(0))
+        train_loss.update(loss, 2 * input1.size(0))
 
         tri_loss.update(loss_tri.item(), 2 * input1.size(0))
         gray_loss.update(loss_color2gray.item(), 2 * input1.size(0))
@@ -407,41 +407,55 @@ def train_pre(x_a, x_m, feat, z_a, labels, cams, loss_tri):
 
     loss.backward()
 
-    return loss, out0
+    return loss.item(), out0
+
+def train_adv1(feat, z, cams):
+
+    z = z.detach()
+    feat = feat.detach()
+    loss_adv1 = (criterion_id(net.W2(z)[0], cams - 1) + criterion_id(net.W2(feat)[0], cams)) * 1.0  # beta
+    loss_adv1.backward()
+    net.camClassifier_optimizer.step()
+    return loss_adv1.item()
 
 def train_e1(feat, labels, loss_tri):
 
     p_c = torch.zeros_like(labels)+n_cam
-    loss_id = criterion_id(net.W1(feat)[0], labels)
+    out0 = net.W1(feat)[0]
+    loss_id = criterion_id(out0, labels)
     loss_e1 = (criterion_id(net.W2(feat)[0], p_c) + loss_id + loss_tri) * 0.01  # alpha
 
     loss_e1.backward()
     net.content_optimizer.step()
-
-def train_e2(z, cams):
-
-    p_l = torch.zeros_like(cams) + 1/n_class
-    loss_cam = criterion_id(net.W2(z)[0], cams - 1)
-    loss_e2 = (loss_cam + criterion_id(net.W1(z)[0], p_l)) * 0.01  # gamma
-
-    cam_loss.update(loss_cam.item(), cams.size(0))
-    loss_e2.backward()
-    net.style_optimizer.step()
-
-def train_adv1(feat, z, cams):
-
-    loss_adv1 = (criterion_id(net.W2(z), cams - 1) + criterion_id(net.W2(feat)[0], cams)) * 1.0  # beta
-    loss_adv1.backward()
-    net.camClassifier_optimizer.step()
-
+    return loss_e1.item(), out0
 
 def train_adv2(feat, z, labels):
-    loss_id = criterion_id(net.W1(feat)[0], labels)
+
+    z = z.detach()
+    feat = feat.detach()
+    out0 = net.W1(feat)[0]
+    loss_id = criterion_id(out0, labels)
     loss_adv2 = (loss_id + criterion_id(net.W1(z)[0], labels)) * 0.01  # etta
 
     id_loss.update(loss_id.item(), labels.size(0))
     loss_adv2.backward()
     net.identifier_optimizer.step()
+    return loss_adv2.item(), out0
+
+def train_e2(z, cams):
+
+
+    pred_ids = net.W1(z)[0]
+    p_l = torch.zeros_like(pred_ids) + 1/n_class
+    loss = categorical_cross_entropy(pred_ids, p_l)
+    loss_cam = criterion_id(net.W2(z)[0], cams - 1)
+    loss_e2 = (loss_cam + loss) * 0.01  # gamma
+
+    cam_loss.update(loss_cam.item(), cams.size(0))
+    loss_e2.backward()
+    net.style_optimizer.step()
+    return loss_e2.item()
+
 
 
 

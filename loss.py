@@ -369,6 +369,7 @@ class CrossEntropyLabelSmooth(nn.Module):
         return loss
 
 
+
 class CenterLoss(nn.Module):
     """Center losses.
 
@@ -453,3 +454,6 @@ def euclidean_dist(x, y):
     dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
     return dist
 
+def categorical_cross_entropy(y_pred, y_true):
+    y_pred = torch.clamp(y_pred, 1e-9, 1 - 1e-9)
+    return -(y_true * torch.log(y_pred)).sum(dim=1).mean()
