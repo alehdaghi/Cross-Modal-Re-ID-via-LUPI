@@ -129,6 +129,8 @@ class ShallowModule(nn.Module):
 
         if arch == 'resnet50':
             resnet = torchvision.models.resnet50(pretrained=True)
+        elif arch == 'resnet34':
+            resnet = torchvision.models.resnet34(pretrained=True)
         else:
             resnet = torchvision.models.resnet18(pretrained=True)
         # avg pooling to global pooling
@@ -152,6 +154,9 @@ class base_resnet(nn.Module):
         if arch == 'resnet50':
             resnet = torchvision.models.resnet50(pretrained=True)
             resnet.layer4[0].conv2.stride = (1, 1)
+        elif arch == 'resnet34':
+            resnet = torchvision.models.resnet34(pretrained=True)
+            resnet.layer4[0].conv1.stride = (1, 1)
         else:
             resnet = torchvision.models.resnet18(pretrained=True)
             resnet.layer4[0].conv1.stride = (1, 1)

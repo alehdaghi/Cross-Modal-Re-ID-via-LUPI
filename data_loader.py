@@ -38,7 +38,7 @@ class SYSUData(data.Dataset):
         img2 = self.transform(img2)
 
         #if self.returnsGray:
-        return img1, img2, img3, target1, target2, target3
+        return img1, img2, img3, target1, target2, target3, cam1, cam2
         #else:
         #    return img1, img2, img3, target1, target2, None#cam1-1, cam2-1
 
