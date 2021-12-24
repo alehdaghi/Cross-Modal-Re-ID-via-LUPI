@@ -333,15 +333,17 @@ def train(epoch):
             loss_tri = (loss_tri_color + loss_tri_thermal) / 2
 
         net.optimizers_zero()
-        if epoch < 30:
+        if epoch < 20:
             loss, out0 = train_pre(x_a, x_m, feat, z_a, labels, cams, loss_tri)
             net.optimizers_step()
         else:
-            loss_adv1= train_adv1(feat, z_a, cams)
-            loss_e1, out0 = train_e1(feat, labels, loss_tri)
-            loss_adv2, out0 = train_adv2(feat, z_a, labels)
-            loss_e2 = train_e2(z_a, cams)
-            loss = loss_adv1 + loss_e1 + loss_adv2 + loss_e2
+            # loss_adv1= train_adv1(feat, z_a, cams)
+            # loss_e1, out0 = train_e1(feat, labels, loss_tri)
+            # loss_adv2, out0 = train_adv2(feat, z_a, labels)
+            # loss_e2 = train_e2(z_a, cams)
+            # loss = loss_adv1 + loss_e1 + loss_adv2 + loss_e2
+            loss, out0 = train_all(feat, z_a, labels, cams, loss_tri)
+            net.optimizers_step()
 
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
@@ -402,6 +404,30 @@ def train_pre(x_a, x_m, feat, z_a, labels, cams, loss_tri):
     loss_id = criterion_id(out0, labels)
     loss =  loss_cam +\
            (criterion_id(out_a, labels) + criterion_id(out_m, labels)) + loss_id + loss_tri
+
+    cam_loss.update(loss_cam.item(), labels.size(0))
+    id_loss.update(loss_id.item(), labels.size(0))
+
+    loss.backward()
+
+    return loss.item(), out0
+
+def train_all(feat, z, labels, cams, loss_tri):
+
+    out0 = net.W1(feat)[0]
+    p_c = torch.zeros_like(labels)+n_cam
+
+    pred_ids = net.W1(z)[0]
+    p_l = torch.zeros_like(pred_ids) + 1/n_class
+    loss_style_id = categorical_cross_entropy(pred_ids, p_l)
+
+    loss_cam = criterion_id(net.W2(z)[0], cams - 1)
+    loss_id = criterion_id(out0, labels)
+    loss_adv1 = (loss_cam + criterion_id(net.W2(feat)[0], cams-1))
+    loss_e1 = (criterion_id(net.W2(feat)[0], p_c) + loss_id + loss_tri)
+    loss_adv2 = (loss_id + criterion_id(net.W1(z)[0], labels))
+    loss_e2 = (loss_cam + loss_style_id)
+    loss = loss_adv1 + loss_e1 + loss_adv2 + loss_e2
 
     cam_loss.update(loss_cam.item(), labels.size(0))
     id_loss.update(loss_id.item(), labels.size(0))
