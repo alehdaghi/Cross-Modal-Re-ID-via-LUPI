@@ -385,6 +385,7 @@ def train(epoch):
                 epoch, batch_idx, len(trainloader),
                 100. * correct / total, now=time_now(), batch_time=batch_time,
                 train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss, gray_loss=gray_loss, cam_loss=cam_loss))
+            sys.stdout.flush()
 
     writer.add_scalar('total_loss', train_loss.avg, epoch)
     writer.add_scalar('id_loss', id_loss.avg, epoch)
@@ -423,7 +424,7 @@ def train_e1(feat, labels, loss_tri):
     p_c = torch.zeros_like(labels)+n_cam
     out0 = net.W1(feat)[0]
     loss_id = criterion_id(out0, labels)
-    loss_e1 = (criterion_id(net.W2(feat)[0], p_c) + loss_id + loss_tri) * 0.01  # alpha
+    loss_e1 = (criterion_id(net.W2(feat)[0], p_c) + loss_id + loss_tri) * 1.01  # alpha
 
     loss_e1.backward()
     net.content_optimizer.step()
@@ -435,7 +436,7 @@ def train_adv2(feat, z, labels):
     feat = feat.detach()
     out0 = net.W1(feat)[0]
     loss_id = criterion_id(out0, labels)
-    loss_adv2 = (loss_id + criterion_id(net.W1(z)[0], labels)) * 0.01  # etta
+    loss_adv2 = (loss_id + criterion_id(net.W1(z)[0], labels)) * 1.01  # etta
 
     id_loss.update(loss_id.item(), labels.size(0))
     loss_adv2.backward()
@@ -449,7 +450,7 @@ def train_e2(z, cams):
     p_l = torch.zeros_like(pred_ids) + 1/n_class
     loss = categorical_cross_entropy(pred_ids, p_l)
     loss_cam = criterion_id(net.W2(z)[0], cams - 1)
-    loss_e2 = (loss_cam + loss) * 0.01  # gamma
+    loss_e2 = (loss_cam + loss) * 1.01  # gamma
 
     cam_loss.update(loss_cam.item(), cams.size(0))
     loss_e2.backward()
