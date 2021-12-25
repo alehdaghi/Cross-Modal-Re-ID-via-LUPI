@@ -352,7 +352,7 @@ def train(epoch):
 
         #correct += (batch_acc / 2)
         _, predicted = out0.max(1)
-        correct += (predicted.eq(labels).sum().item() / 2)
+        correct += (predicted.eq(labels).sum().item())
 
         # if args.cont_loss:
         #     feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
@@ -551,7 +551,7 @@ def test(epoch):
 
 # training
 print('==> Start Training...')
-for epoch in range(start_epoch, 82):
+for epoch in range(start_epoch, 182):
 
     print('==> Preparing Data Loader...')
     # identity sampler
@@ -562,8 +562,7 @@ for epoch in range(start_epoch, 82):
     trainset.cIndex = sampler.index1  # color index
     trainset.tIndex = sampler.index2  # thermal index
     print(epoch)
-    print(trainset.cIndex)
-    print(trainset.tIndex)
+
 
     loader_batch = args.batch_size * args.num_pos
 

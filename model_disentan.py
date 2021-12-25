@@ -37,7 +37,7 @@ class Disentangle_net(nn.Module):
     def forward(self, x1, x2, x3=None, modal=0):
         x = self.E1(x1, x2, x3=x3, modal=modal)
         x_a = self.g_avg(x)
-        x_m = self.g_avg(x)
+        x_m = self.g_max(x)
         x_c = x_a + x_m
         if self.training:
             z = self.E2(x1, x2, x3=x3, modal=modal)
