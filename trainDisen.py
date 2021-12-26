@@ -290,6 +290,7 @@ def train(epoch):
         if args.use_gray or args.uni == 3:
             labels = torch.cat((label1, label2, label1), 0)
             input3 = Variable(input3.cuda())
+            cams = torch.cat((cam1, cam2, cam1), 0)
         else:
             input3 = None
             labels = torch.cat((label1, label2), 0)
@@ -307,18 +308,9 @@ def train(epoch):
         x_a, x_m, feat, z_a = net(input1, input2, x3=input3, modal=args.uni)
 
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
+        loss_tri_cam    = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
-            color_feat, thermal_feat, gray_feat = torch.split(feat, label1.shape[0])
-            color_label, thermal_label, gray_label = torch.split(labels, label1.shape[0])
-            loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, gray_feat,
-                                                     color_label, thermal_label, gray_label)
-            loss_tri_thermal = cross_triplet_creiteron(thermal_feat, gray_feat, color_feat,
-                                                       thermal_label, gray_label, color_label)
-            loss_tri_gray = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
-                                                    gray_label, color_label, thermal_label)
-            loss_tri = (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3
-            loss_color2gray = reconst_loss(color_feat, gray_feat)
-
+            loss_tri , loss_color2gray = cross_triplet_with_gray(feat, labels)
         else:
             if args.uni != 0:
                 color_feat, thermal_feat = feat, feat
@@ -333,8 +325,8 @@ def train(epoch):
             loss_tri = (loss_tri_color + loss_tri_thermal) / 2
 
         net.optimizers_zero()
-        if epoch < 20:
-            loss, out0 = train_pre(x_a, x_m, feat, z_a, labels, cams, loss_tri)
+        if epoch < 80:
+            loss, out0 = train_pre(x_a, x_m, feat, z_a, labels, cams, loss_tri+loss_color2gray)
             net.optimizers_step()
         else:
             # loss_adv1= train_adv1(feat, z_a, cams)
@@ -342,7 +334,7 @@ def train(epoch):
             # loss_adv2, out0 = train_adv2(feat, z_a, labels)
             # loss_e2 = train_e2(z_a, cams)
             # loss = loss_adv1 + loss_e1 + loss_adv2 + loss_e2
-            loss, out0 = train_all(feat, z_a, labels, cams, loss_tri)
+            loss, out0 = train_all(feat, z_a, labels, cams, loss_tri+loss_color2gray)
             net.optimizers_step()
 
         #loss_tri, batch_acc = criterion_tri(feat, labels)
