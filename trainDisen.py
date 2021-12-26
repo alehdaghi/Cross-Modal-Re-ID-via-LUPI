@@ -310,7 +310,18 @@ def train(epoch):
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         loss_tri_cam    = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
-            loss_tri , loss_color2gray = cross_triplet_with_gray(feat, labels)
+            color_feat, thermal_feat, gray_feat = torch.split(feat, labels.shape[0]//3)
+            color_label, thermal_label, gray_label = torch.split(labels, labels.shape[0]//3)
+            loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, gray_feat,
+                                                     color_label, thermal_label, gray_label)
+            loss_tri_thermal = cross_triplet_creiteron(thermal_feat, gray_feat, color_feat,
+                                                       thermal_label, gray_label, color_label)
+            loss_tri_gray = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
+                                                    gray_label, color_label, thermal_label)
+
+            loss_color2gray = F.mse_loss(color_feat, gray_feat)
+            loss_tri = (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3
+            #loss_tri , loss_color2gray = cross_triplet_with_gray(feat, labels)
         else:
             if args.uni != 0:
                 color_feat, thermal_feat = feat, feat
