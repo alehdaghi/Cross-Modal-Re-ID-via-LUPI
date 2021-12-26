@@ -19,7 +19,7 @@ def load_data(input_data_path ):
     return file_image, file_label
     
 
-def GenIdx( train_color_label, train_thermal_label):
+def GenIdx( train_color_label, train_ir_label):
     color_pos = []
     unique_label_color = np.unique(train_color_label)
     for i in range(len(unique_label_color)):
@@ -27,9 +27,9 @@ def GenIdx( train_color_label, train_thermal_label):
         color_pos.append(tmp_pos)
         
     thermal_pos = []
-    unique_label_thermal = np.unique(train_thermal_label)
+    unique_label_thermal = np.unique(train_ir_label)
     for i in range(len(unique_label_thermal)):
-        tmp_pos = [k for k,v in enumerate(train_thermal_label) if v==unique_label_thermal[i]]
+        tmp_pos = [k for k,v in enumerate(train_ir_label) if v==unique_label_thermal[i]]
         thermal_pos.append(tmp_pos)
     return color_pos, thermal_pos
     
@@ -64,17 +64,17 @@ def ExtractCam(gall_img):
 class IdentitySampler(Sampler):
     """Sample person identities evenly in each batch.
         Args:
-            train_color_label, train_thermal_label: labels of two modalities
+            train_color_label, train_ir_label: labels of two modalities
             color_pos, thermal_pos: positions of each identity
             batchSize: batch size
     """
 
-    def __init__(self, train_color_label, train_thermal_label, color_pos, thermal_pos, num_pos, batchSize, epoch):        
+    def __init__(self, train_color_label, train_ir_label, color_pos, thermal_pos, num_pos, batchSize, epoch):
         uni_label = np.unique(train_color_label)
         self.n_classes = len(uni_label)
         
         
-        N = np.maximum(len(train_color_label), len(train_thermal_label)) 
+        N = np.maximum(len(train_color_label), len(train_ir_label))
         for j in range(int(N/(batchSize*num_pos))+1):
             batch_idx = np.random.choice(uni_label, batchSize, replace = False)  
             for i in range(batchSize):

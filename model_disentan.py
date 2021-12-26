@@ -60,7 +60,7 @@ class Disentangle_net(nn.Module):
         self.style_optimizer = optim.Adam(list(self.E2.parameters()), lr=0.00045, betas=(0.9, 0.999), weight_decay=5e-4)
         self.camClassifier_optimizer = optim.Adam(list(self.W2.parameters()), lr=0.00045, betas=(0.9, 0.999), weight_decay=5e-4)
 
-        self.milestones = [81]
+        self.milestones = [181]
         self.content_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.content_optimizer, milestones=self.milestones, gamma=0.1)
         self.identifier_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.identifier_optimizer, milestones=self.milestones, gamma=0.1)
         self.style_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.style_optimizer, milestones=self.milestones, gamma=0.1)

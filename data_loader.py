@@ -8,17 +8,16 @@ class SYSUData(data.Dataset):
         
         data_dir = '../Datasets/SYSU-MM01/'
         # Load training images (path) and labels
-        train_color_image = np.load(data_dir + 'train_rgb_resized_img.npy')
-        self.train_color_label = np.load(data_dir + 'train_rgb_resized_label.npy')
-        self.train_color_cam = np.load(data_dir + 'train_rgb_resized_camera.npy')
+        self.train_color_image = np.load(data_dir + 'train+Val_rgb_resized_img.npy')
+        self.train_color_label = np.load(data_dir + 'train+Val_rgb_resized_label.npy')
+        self.train_color_cam = np.load(data_dir + 'train+Val_rgb_resized_camera.npy')
 
-        train_thermal_image = np.load(data_dir + 'train_ir_resized_img.npy')
-        self.train_thermal_label = np.load(data_dir + 'train_ir_resized_label.npy')
-        self.train_thermal_cam = np.load(data_dir + 'train_ir_resized_camera.npy')
+        self.train_ir_image = np.load(data_dir + 'train+Val_ir_resized_img.npy')
+        self.train_thermal_label = np.load(data_dir + 'train+Val_ir_resized_label.npy')
+        self.train_thermal_cam = np.load(data_dir + 'train+Val_ir_resized_camera.npy')
         
         # BGR to RGB
-        self.train_color_image   = train_color_image
-        self.train_thermal_image = train_thermal_image
+
         self.transform = transform
         self.cIndex = colorIndex
         self.tIndex = thermalIndex
@@ -27,7 +26,7 @@ class SYSUData(data.Dataset):
     def __getitem__(self, index):
 
         img1,  target1, cam1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]], self.train_color_cam[self.cIndex[index]]
-        img2,  target2, cam2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]], self.train_thermal_cam[self.tIndex[index]]
+        img2,  target2, cam2 = self.train_ir_image[self.tIndex[index]], self.train_ir_label[self.tIndex[index]], self.train_thermal_cam[self.tIndex[index]]
         img3, target3 = -1, -1
         if self.returnsGray:
             img3 = self.rgb2gray(img1)
@@ -56,7 +55,7 @@ class RegDBData(data.Dataset):
         train_thermal_list = data_dir + 'idx/train_thermal_{}'.format(trial)+ '.txt'
 
         color_img_file, train_color_label = load_data(train_color_list)
-        thermal_img_file, train_thermal_label = load_data(train_thermal_list)
+        thermal_img_file, train_ir_label = load_data(train_thermal_list)
         
         train_color_image = []
         for i in range(len(color_img_file)):
@@ -81,7 +80,7 @@ class RegDBData(data.Dataset):
         
         # BGR to RGB
         self.train_thermal_image = train_thermal_image
-        self.train_thermal_label = train_thermal_label
+        self.train_ir_label = train_ir_label
         
         self.transform = transform
         self.cIndex = colorIndex
@@ -90,7 +89,7 @@ class RegDBData(data.Dataset):
     def __getitem__(self, index):
 
         img1,  target1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]]
-        img2,  target2 = self.train_thermal_image[self.tIndex[index]], self.train_thermal_label[self.tIndex[index]]
+        img2,  target2 = self.train_thermal_image[self.tIndex[index]], self.train_ir_label[self.tIndex[index]]
         img3 = self.rgb2gray(img1)
 
         img1 = self.transform(img1)

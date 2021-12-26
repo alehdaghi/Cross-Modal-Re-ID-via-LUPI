@@ -11,19 +11,19 @@ ir_cameras = ['cam3','cam6']
 data = 'train'
 # load id info
 file_path_train = os.path.join(data_path,'exp/'+data+'_id.txt')
-#file_path_val   = os.path.join(data_path,'exp/val_id.txt')
+file_path_val   = os.path.join(data_path,'exp/val_id.txt')
 with open(file_path_train, 'r') as file:
     ids = file.read().splitlines()
     ids = [int(y) for y in ids[0].split(',')]
     id_train = ["%04d" % x for x in ids]
 
-#with open(file_path_val, 'r') as file:
-#    ids = file.read().splitlines()
-#    ids = [int(y) for y in ids[0].split(',')]
-#    id_val = ["%04d" % x for x in ids]
+with open(file_path_val, 'r') as file:
+    ids = file.read().splitlines()
+    ids = [int(y) for y in ids[0].split(',')]
+    id_val = ["%04d" % x for x in ids]
 
 # combine train and val split
-#id_train.extend(id_val)
+id_train.extend(id_val)
 
 files_rgb = []
 files_ir = []
@@ -70,6 +70,7 @@ def read_imgs(train_image):
     return np.array(train_img), np.array(train_label), np.array(train_camera)
 
 # rgb imges
+data += '+Val'
 train_img, train_label, train_camera = read_imgs(files_rgb)
 np.save(data_path + data+'_rgb_resized_img.npy', train_img)
 np.save(data_path + data+'_rgb_resized_label.npy', train_label)

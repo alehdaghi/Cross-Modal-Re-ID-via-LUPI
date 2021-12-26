@@ -255,7 +255,7 @@ elif dataset == 'regdb':
         # training set
         trainset = RegDBData(data_path, test_trial, transform=transform_train)
         # generate the idx of each person identity
-        color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_thermal_label)
+        color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_ir_label)
 
         # testing set
         query_img, query_label = process_test_regdb(data_path, trial=test_trial, modal='visible')
