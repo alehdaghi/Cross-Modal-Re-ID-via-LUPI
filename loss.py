@@ -459,8 +459,9 @@ def categorical_cross_entropy(y_pred, y_true):
     return -(y_true * torch.log(y_pred)).sum(dim=1).mean()
 
 
+cross_triplet_creiteron = TripletLoss(0.3, 'euclidean')
 def cross_triplet_with_gray(feat, labels, margin=0.3, metric= 'euclidean'):
-    cross_triplet_creiteron = TripletLoss(0.3, 'euclidean')
+
     assert (labels.shape[0] % 3 == 0)
     color_feat, thermal_feat, gray_feat = torch.split(feat, labels.shape[0]//3)
     color_label, thermal_label, gray_label = torch.split(labels, labels.shape[0]//3)
