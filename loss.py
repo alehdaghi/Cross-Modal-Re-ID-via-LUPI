@@ -457,3 +457,20 @@ def euclidean_dist(x, y):
 def categorical_cross_entropy(y_pred, y_true):
     y_pred = torch.clamp(y_pred, 1e-9, 1 - 1e-9)
     return -(y_true * torch.log(y_pred)).sum(dim=1).mean()
+
+
+def cross_triplet_with_gray(feat, labels, margin=0.3, metric= 'euclidean'):
+    cross_triplet_creiteron = TripletLoss(0.3, 'euclidean')
+    assert (labels.shape[0] % 3 == 0)
+    color_feat, thermal_feat, gray_feat = torch.split(feat, labels.shape[0]//3)
+    color_label, thermal_label, gray_label = torch.split(labels, labels.shape[0]//3)
+    loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, gray_feat,
+                                             color_label, thermal_label, gray_label)
+    loss_tri_thermal = cross_triplet_creiteron(thermal_feat, gray_feat, color_feat,
+                                               thermal_label, gray_label, color_label)
+    loss_tri_gray = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
+                                            gray_label, color_label, thermal_label)
+
+    loss_color2gray = F.mse_loss(color_feat, gray_feat)
+    return (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3 ,\
+           loss_color2gray

@@ -13,8 +13,8 @@ class SYSUData(data.Dataset):
         self.train_color_cam = np.load(data_dir + 'train+Val_rgb_resized_camera.npy')
 
         self.train_ir_image = np.load(data_dir + 'train+Val_ir_resized_img.npy')
-        self.train_thermal_label = np.load(data_dir + 'train+Val_ir_resized_label.npy')
-        self.train_thermal_cam = np.load(data_dir + 'train+Val_ir_resized_camera.npy')
+        self.train_ir_label = np.load(data_dir + 'train+Val_ir_resized_label.npy')
+        self.train_ir_cam = np.load(data_dir + 'train+Val_ir_resized_camera.npy')
         
         # BGR to RGB
 
@@ -26,7 +26,7 @@ class SYSUData(data.Dataset):
     def __getitem__(self, index):
 
         img1,  target1, cam1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]], self.train_color_cam[self.cIndex[index]]
-        img2,  target2, cam2 = self.train_ir_image[self.tIndex[index]], self.train_ir_label[self.tIndex[index]], self.train_thermal_cam[self.tIndex[index]]
+        img2,  target2, cam2 = self.train_ir_image[self.tIndex[index]], self.train_ir_label[self.tIndex[index]], self.train_ir_cam[self.tIndex[index]]
         img3, target3 = -1, -1
         if self.returnsGray:
             img3 = self.rgb2gray(img1)
