@@ -267,7 +267,7 @@ cam_loss = AverageMeter()
 def train(epoch):
 
     net.set_train()
-    net.lr_scheduler_step(epoch)
+
     train_loss.reset()
     id_loss.reset()
     tri_loss.reset()
@@ -336,7 +336,7 @@ def train(epoch):
             # loss = loss_adv1 + loss_e1 + loss_adv2 + loss_e2
             loss, out0 = train_all(feat, z_a, labels, cams, loss_tri+loss_color2gray)
             net.optimizers_step()
-
+        net.lr_scheduler_step(epoch)
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
         #l1, _ = hctriplet(feat, labels)
