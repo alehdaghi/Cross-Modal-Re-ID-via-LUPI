@@ -13,11 +13,12 @@ import torchvision.transforms as transforms
 from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
-from model import embed_net
+from model_cmalign import embed_net
 from sup_con_loss import SupConLoss
 from utils import *
 from loss import *
 from tensorboardX import SummaryWriter
+from cm_align import CMAlign
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
 parser.add_argument('--dataset', default='sysu', help='dataset name: regdb or sysu]')
@@ -96,10 +97,7 @@ if not os.path.isdir(args.vis_log_path):
     os.makedirs(args.vis_log_path)
 
 suffix = dataset
-if args.method=='agw':
-    suffix = suffix + '_agw_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
-else:
-    suffix = suffix + '_base_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
+suffix = suffix + '_cmalign_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
 
 
 if not args.optim == 'sgd':
@@ -209,6 +207,7 @@ if args.method =='base':
 else:
     net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
 
+net.cmalign = CMAlign(args.batch_size, args.num_pos, use_gray=args.use_gray)
 net.to(device)
 cudnn.benchmark = True
 print(net.count_params())
@@ -287,9 +286,11 @@ def train(epoch):
     id_loss = AverageMeter()
     tri_loss = AverageMeter()
     gray_loss = AverageMeter()
-    center_loss = AverageMeter()
+    KL_loss = AverageMeter()
+    A_loss = AverageMeter()
     data_time = AverageMeter()
     batch_time = AverageMeter()
+
     correct = 0
     total = 0
 
@@ -297,7 +298,7 @@ def train(epoch):
     net.train()
     end = time.time()
 
-    for batch_idx, (input1, input2, input3, label1, label2, _, cam1, cam2) in enumerate(trainloader):
+    for batch_idx, (input1, input2, input3, label1, label2, _,cam1, cam2) in enumerate(trainloader):
 
         bs = label1.shape[0]
         input1 = Variable(input1.cuda())
@@ -317,7 +318,7 @@ def train(epoch):
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
 
-        feat, out0, = net(input1, input2, x3=input3, modal=args.uni)
+        feat, out0, align_outs = net(input1, input2, x3=input3, modal=args.uni)
 
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
@@ -346,6 +347,15 @@ def train(epoch):
             loss_tri = (loss_tri_color + loss_tri_thermal) / 2
 
         loss_id = criterion_id(out0, labels)
+
+        if align_outs is not None:
+            loss_KL = F.kl_div(F.log_softmax(out0, dim=1), F.softmax(align_outs['cls_ic_layer4'], dim=1), reduction='batchmean')
+            loss_id += criterion_id(align_outs['cls_ic_layer4'], labels)
+            loss_id /= 2
+            tri_loss.update(loss_tri.item(), 2 * input1.size(0))
+            loss_tri += align_outs['loss_dt']
+            KL_loss.update(loss_KL.item(), 2 * input1.size(0))
+            A_loss.update(align_outs['loss_dt'].item(), 2 * input1.size(0))
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
         #l1, _ = hctriplet(feat, labels)
@@ -369,9 +379,9 @@ def train(epoch):
         # update P
         train_loss.update(loss.item(), 2 * input1.size(0))
         id_loss.update(loss_id.item(), 2 * input1.size(0))
-        tri_loss.update(loss_tri.item(), 2 * input1.size(0))
+
         gray_loss.update(loss_color2gray.item(), 2 * input1.size(0))
-        #center_loss.update(loss_center.item(), 2 * input1.size(0))
+
         total += labels.size(0)
 
         # measure elapsed time
@@ -385,11 +395,13 @@ def train(epoch):
                   'iLoss: {id_loss.val:.4f} ({id_loss.avg:.4f}) '
                   'TLoss: {tri_loss.val:.4f} ({tri_loss.avg:.4f}) '
                   'GLoss: {gray_loss.val:.4f} ({gray_loss.avg:.4f}) '
-                  'CLoss: {center_loss.val:.4f} ({center_loss.avg:.4f}) '
+                  'KLLoss: {KL_loss.val:.4f} ({KL_loss.avg:.4f}) '
+                  'ALoss: {A_loss.val:.4f} ({A_loss.avg:.4f}) '
                   'Accu: {:.2f}'.format(
                 epoch, batch_idx, len(trainloader), current_lr,
                 100. * correct / total, now=time_now(), batch_time=batch_time,
-                train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss, gray_loss=gray_loss, center_loss=center_loss))
+                train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss,
+                gray_loss=gray_loss, KL_loss=KL_loss, A_loss=A_loss))
 
     writer.add_scalar('total_loss', train_loss.avg, epoch)
     writer.add_scalar('id_loss', id_loss.avg, epoch)
