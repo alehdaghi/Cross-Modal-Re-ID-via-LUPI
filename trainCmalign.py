@@ -318,7 +318,7 @@ def train(epoch):
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
 
-        feat, out0, align_outs = net(input1, input2, x3=input3, modal=args.uni)
+        feat, out0, align_outs = net(input1, input2, x3=input3, modal=args.uni, use_cmalign=True)
 
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:

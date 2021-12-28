@@ -222,7 +222,7 @@ class embed_net(nn.Module):
         self.gm_pool = gm_pool
         self.cmalign = None
 
-    def forward(self, x1, x2, x3=None, modal=0, with_feature = False, use_cmalign=True):
+    def forward(self, x1, x2, x3=None, modal=0, with_feature = False, use_cmalign=False):
         if modal == 0:
             x1 = self.visible_module(x1)
             x2 = self.thermal_module(x2)
@@ -287,7 +287,7 @@ class embed_net(nn.Module):
 
         feat = self.bottleneck(x_pool)
         cmalign_ret = None
-        if use_cmalign:
+        if use_cmalign and self.training:
 
             if x3 != None:
                 out4 = self.cmalign(x[:x1.shape[0]], x[x1.shape[0]:2*x1.shape[0]], feat_g=x[2*x1.shape[0]:])
@@ -319,7 +319,10 @@ class embed_net(nn.Module):
 
         if with_feature:
             return retX_pool, retFeat, x, cmalign_ret
-        return retX_pool, retFeat, cmalign_ret
+        if use_cmalign:
+            return retX_pool, retFeat, cmalign_ret
+        else:
+            return retX_pool, retFeat
 
     def getPoolDim(self):
         return self.pool_dim
