@@ -119,6 +119,8 @@ if args.separate_batch_norm:
 if args.arch == 'resnet18':
     suffix = suffix + '_arch18'
 
+if args.is_test:
+    suffix = dataset+'_cmalign_test_'+args.resume
 
 
 if dataset == 'regdb':
