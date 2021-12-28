@@ -322,9 +322,13 @@ def train(epoch):
 
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
-        use_cmalign = (epoch >= 24)
-        feat, out0, align_outs = net(input1, input2, x3=input3,
-                                     modal=args.uni, use_cmalign= use_cmalign)
+        align_outs = None
+        if epoch >= 21:
+            feat, out0, align_outs = net(input1, input2, x3=input3,
+                                     modal=args.uni, use_cmalign= True)
+        else:
+            feat, out0 = net(input1, input2, x3=input3,
+                                     modal=args.uni, use_cmalign= False)
 
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
@@ -374,9 +378,9 @@ def train(epoch):
         if args.cont_loss:
             feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
             loss_cont = criterion_contrastive(feat, labels[:bs])
-            loss += loss_cont + loss_id
+            loss = loss + loss_cont + loss_id
         else:
-            loss += loss_id + loss_tri + loss_color2gray #+ loss_center
+            loss = loss + loss_id + loss_tri + loss_color2gray #+ loss_center
 
         optimizer.zero_grad()
         loss.backward()
