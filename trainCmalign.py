@@ -47,7 +47,7 @@ parser.add_argument('--batch-size', default=8, type=int,
                     metavar='B', help='training batch size')
 parser.add_argument('--test-batch', default=64, type=int,
                     metavar='tb', help='testing batch size')
-parser.add_argument('--method', default='agw', type=str,
+parser.add_argument('--method', default='base', type=str,
                     metavar='m', help='method type: base or agw')
 parser.add_argument('--margin', default=0.3, type=float,
                     metavar='margin', help='triplet losses margin')
@@ -66,9 +66,12 @@ parser.add_argument('--use_gray', dest='use_gray', help='use gray as 3rd modalit
 parser.add_argument('--separate_batch_norm', dest='separate_batch_norm', help='separate batch norm layers only in first layers',
                     action='store_true')
 parser.add_argument('--cont', dest='cont_loss', help='use Contrastive Loss', action='store_true')
+parser.add_argument('--test', dest='is_test', help='test only', action='store_true')
 parser.set_defaults(use_gray=False)
 parser.set_defaults(separate_batch_norm=False)
 parser.set_defaults(cont_loss=False)
+parser.set_defaults(is_test=False)
+
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -166,7 +169,7 @@ if dataset == 'sysu':
     elif args.uni == 3:
         args.mode = 'Gray'
     query_img, query_label, query_cam = process_query_sysu(data_path, mode=args.mode)
-    gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0)
+    gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=0, single_shot=not args.is_test)
 
 elif dataset == 'regdb':
     # training set
@@ -402,6 +405,7 @@ def train(epoch):
                 100. * correct / total, now=time_now(), batch_time=batch_time,
                 train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss,
                 gray_loss=gray_loss, KL_loss=KL_loss, A_loss=A_loss))
+            sys.stdout.flush()
 
     writer.add_scalar('total_loss', train_loss.avg, epoch)
     writer.add_scalar('id_loss', id_loss.avg, epoch)
@@ -475,9 +479,48 @@ def test(epoch):
     writer.add_scalar('mINP_att', mINP_att, epoch)
     return cmc, mAP, mINP, cmc_att, mAP_att, mINP_att
 
+best_acc = 0
+best_epoch = 0
+
+def checkResult(epoch):
+    print('Test Epoch: {}'.format(epoch))
+    global best_acc, best_epoch
+    # testing
+    cmc, mAP, mINP, cmc_att, mAP_att, mINP_att = test(epoch)
+    # save model
+    if max(cmc[0], cmc_att[0]) > best_acc:  # not the real best for sysu-mm01
+        best_acc = max(cmc[0], cmc_att[0])
+        best_epoch = epoch
+        state = {
+            'net': net.state_dict(),
+            'cmc': cmc_att,
+            'mAP': mAP_att,
+            'mINP': mINP_att,
+            'epoch': epoch,
+        }
+        torch.save(state, checkpoint_path + suffix + '_best.t')
+
+    # save model
+    if epoch > 10 and epoch % args.save_epoch == 0:
+        state = {
+            'net': net.state_dict(),
+            'cmc': cmc,
+            'mAP': mAP,
+            'epoch': epoch,
+        }
+        torch.save(state, checkpoint_path + suffix + '_epoch_{}.t'.format(epoch))
+
+    print('POOL:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
+        cmc[0], cmc[4], cmc[9], cmc[19], mAP, mINP))
+    print('FC:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
+        cmc_att[0], cmc_att[4], cmc_att[9], cmc_att[19], mAP_att, mINP_att))
+    print('Best Epoch [{}]'.format(best_epoch))
 
 # training
 print('==> Start Training...')
+if args.is_test:
+    checkResult(0)
+    exit(0)
 for epoch in range(start_epoch, 82):
 
     print('==> Preparing Data Loader...')
@@ -501,35 +544,4 @@ for epoch in range(start_epoch, 82):
     train(epoch)
 
     if epoch >= 0 and epoch % 4 == 0:
-        print('Test Epoch: {}'.format(epoch))
-
-        # testing
-        cmc, mAP, mINP, cmc_att, mAP_att, mINP_att = test(epoch)
-        # save model
-        if max(cmc[0], cmc_att[0]) > best_acc:  # not the real best for sysu-mm01
-            best_acc = max(cmc[0], cmc_att[0])
-            best_epoch = epoch
-            state = {
-                'net': net.state_dict(),
-                'cmc': cmc_att,
-                'mAP': mAP_att,
-                'mINP': mINP_att,
-                'epoch': epoch,
-            }
-            torch.save(state, checkpoint_path + suffix + '_best.t')
-
-        # save model
-        if epoch > 10 and epoch % args.save_epoch == 0:
-            state = {
-                'net': net.state_dict(),
-                'cmc': cmc,
-                'mAP': mAP,
-                'epoch': epoch,
-            }
-            torch.save(state, checkpoint_path + suffix + '_epoch_{}.t'.format(epoch))
-
-        print('POOL:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
-            cmc[0], cmc[4], cmc[9], cmc[19], mAP, mINP))
-        print('FC:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
-            cmc_att[0], cmc_att[4], cmc_att[9], cmc_att[19], mAP_att, mINP_att))
-        print('Best Epoch [{}]'.format(best_epoch))
+        checkResult(epoch)
