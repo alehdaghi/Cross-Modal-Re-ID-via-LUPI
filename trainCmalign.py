@@ -347,15 +347,15 @@ def train(epoch):
             loss_tri = (loss_tri_color + loss_tri_thermal) / 2
 
         loss_id = criterion_id(out0, labels)
-
+        loss = torch.tensor(0.0, requires_grad=True, device=device)
         if align_outs is not None:
             loss_KL = F.kl_div(F.log_softmax(out0, dim=1), F.softmax(align_outs['cls_ic_layer4'], dim=1), reduction='batchmean')
             loss_id += criterion_id(align_outs['cls_ic_layer4'], labels)
             loss_id /= 2
             tri_loss.update(loss_tri.item(), 2 * input1.size(0))
-            loss_tri += align_outs['loss_dt']
             KL_loss.update(loss_KL.item(), 2 * input1.size(0))
             A_loss.update(align_outs['loss_dt'].item(), 2 * input1.size(0))
+            loss = align_outs['loss_dt'] + loss_KL
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
         #l1, _ = hctriplet(feat, labels)
@@ -368,9 +368,9 @@ def train(epoch):
         if args.cont_loss:
             feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
             loss_cont = criterion_contrastive(feat, labels[:bs])
-            loss = loss_cont + loss_id
+            loss += loss_cont + loss_id
         else:
-            loss = loss_id + loss_tri + loss_color2gray #+ loss_center
+            loss += loss_id + loss_tri + loss_color2gray #+ loss_center
 
         optimizer.zero_grad()
         loss.backward()
@@ -388,16 +388,16 @@ def train(epoch):
         batch_time.update(time.time() - end)
         end = time.time()
         if batch_idx % 50 == 0:
-            print('Epoch: [{}][{}/{}] '
-                  'Time: {now} ({batch_time.avg:.3f}) '
+            print('E: [{}][{}/{}] '
+                  'T: {now} ({batch_time.avg:.3f}) '
                   'lr:{:.3f} '
                   'Loss: {train_loss.val:.4f} ({train_loss.avg:.4f}) '
-                  'iLoss: {id_loss.val:.4f} ({id_loss.avg:.4f}) '
-                  'TLoss: {tri_loss.val:.4f} ({tri_loss.avg:.4f}) '
-                  'GLoss: {gray_loss.val:.4f} ({gray_loss.avg:.4f}) '
-                  'KLLoss: {KL_loss.val:.4f} ({KL_loss.avg:.4f}) '
-                  'ALoss: {A_loss.val:.4f} ({A_loss.avg:.4f}) '
-                  'Accu: {:.2f}'.format(
+                  'il: {id_loss.val:.4f} ({id_loss.avg:.4f}) '
+                  'Tl: {tri_loss.val:.4f} ({tri_loss.avg:.4f}) '
+                  'Gl: {gray_loss.val:.4f} ({gray_loss.avg:.4f}) '
+                  'KLl: {KL_loss.val:.4f} ({KL_loss.avg:.4f}) '
+                  'Al: {A_loss.val:.4f} ({A_loss.avg:.4f}) '
+                  'Acc: {:.2f}'.format(
                 epoch, batch_idx, len(trainloader), current_lr,
                 100. * correct / total, now=time_now(), batch_time=batch_time,
                 train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss,
@@ -407,7 +407,8 @@ def train(epoch):
     writer.add_scalar('id_loss', id_loss.avg, epoch)
     writer.add_scalar('tri_loss', tri_loss.avg, epoch)
     writer.add_scalar('gray_loss', gray_loss.avg, epoch)
-    writer.add_scalar('center_loss', center_loss.avg, epoch)
+    writer.add_scalar('KL_loss', KL_loss.avg, epoch)
+    writer.add_scalar('A_loss', A_loss.avg, epoch)
     writer.add_scalar('lr', current_lr, epoch)
 
 
