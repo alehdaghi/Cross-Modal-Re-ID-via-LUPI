@@ -172,14 +172,20 @@ class CMAlign(nn.Module):
         feat_recon_pos = self.reconstruct(mask, feat_warp_pos, feat)
 
         # negative
-        feat_target_neg = feat[neg_idx]
-        feature_sim = self.feature_similarity(feat, feat_target_neg)
-        matching_pr = self.matching_probability(feature_sim)
+        #feat_target_neg = feat[neg_idx]
+        #feature_sim = self.feature_similarity(feat, feat_target_neg)
+        #matching_pr = self.matching_probability(feature_sim)
 
-        feat_warp = self.soft_warping(matching_pr, feat_target_neg)
-        feat_recon_neg = self.reconstruct(mask, feat_warp, feat)
+        #feat_warp = self.soft_warping(matching_pr, feat_target_neg)
+        #feat_recon_neg = self.reconstruct(mask, feat_warp, feat)
 
-        loss = torch.mean(comask_pos * self.criterion(feat, feat_recon_pos, feat_recon_neg))
+        a = self.g_avg(comask_pos*feat)
+        p = self.g_avg(comask_pos*feat_recon_pos)
+        #loss = torch.mean(comask_pos * self.criterion(feat, feat_recon_pos, feat_recon_neg))
+        loss = F.mse_loss(a, p, reduction='sum') / batch_size
 
         return {'feat': feat_recon_pos, 'loss': loss}
 
+    def g_avg(self, x):
+        x_pool = F.adaptive_avg_pool2d(x,1)
+        return x_pool.view(x_pool.size(0), x_pool.size(1))

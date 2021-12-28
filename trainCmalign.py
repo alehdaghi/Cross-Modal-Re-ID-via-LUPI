@@ -273,9 +273,9 @@ def adjust_learning_rate(optimizer, epoch):
     elif epoch >= 10 and epoch < 20:
         lr = args.lr
     elif epoch >= 20 and epoch < 50:
-        lr = args.lr * 0.1
+        lr = args.lr * 0.3
     elif epoch >= 50:
-        lr = args.lr * 0.01
+        lr = args.lr * 0.02
 
     optimizer.param_groups[0]['lr'] = 0.1 * lr
     for i in range(len(optimizer.param_groups) - 1):
@@ -322,8 +322,9 @@ def train(epoch):
 
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
-
-        feat, out0, align_outs = net(input1, input2, x3=input3, modal=args.uni, use_cmalign=True)
+        use_cmalign = (epoch >= 24)
+        feat, out0, align_outs = net(input1, input2, x3=input3,
+                                     modal=args.uni, use_cmalign= use_cmalign)
 
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
@@ -360,7 +361,7 @@ def train(epoch):
             tri_loss.update(loss_tri.item(), 2 * input1.size(0))
             KL_loss.update(loss_KL.item(), 2 * input1.size(0))
             A_loss.update(align_outs['loss_dt'].item(), 2 * input1.size(0))
-            loss = align_outs['loss_dt'] + loss_KL
+            loss = align_outs['loss_dt'] * 0.25 + loss_KL
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
         #l1, _ = hctriplet(feat, labels)
