@@ -362,7 +362,6 @@ def train(epoch):
             loss_KL = F.kl_div(F.log_softmax(out0, dim=1), F.softmax(align_outs['cls_ic_layer4'], dim=1), reduction='batchmean')
             loss_id += criterion_id(align_outs['cls_ic_layer4'], labels)
             loss_id /= 2
-            tri_loss.update(loss_tri.item(), 2 * input1.size(0))
             KL_loss.update(loss_KL.item(), 2 * input1.size(0))
             A_loss.update(align_outs['loss_dt'].item(), 2 * input1.size(0))
             loss = align_outs['loss_dt'] * 0.25 + loss_KL
@@ -389,7 +388,7 @@ def train(epoch):
         # update P
         train_loss.update(loss.item(), 2 * input1.size(0))
         id_loss.update(loss_id.item(), 2 * input1.size(0))
-
+        tri_loss.update(loss_tri.item(), 2 * input1.size(0))
         gray_loss.update(loss_color2gray.item(), 2 * input1.size(0))
 
         total += labels.size(0)
