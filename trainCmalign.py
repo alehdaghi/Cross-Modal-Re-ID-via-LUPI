@@ -323,7 +323,7 @@ def train(epoch):
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
         align_outs = None
-        if epoch >= 21:
+        if epoch >= 0:
             feat, out0, align_outs = net(input1, input2, x3=input3,
                                      modal=args.uni, use_cmalign= True)
         else:
