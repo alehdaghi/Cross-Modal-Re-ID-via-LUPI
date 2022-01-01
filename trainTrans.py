@@ -230,8 +230,8 @@ if len(args.resume) > 0:
         checkpoint = torch.load(model_path)
         start_epoch = checkpoint['epoch']
         net.load_state_dict(checkpoint['net'])
-        print('==> loaded checkpoint {} (epoch {})'
-              .format(args.resume, checkpoint['epoch']))
+        print('==> loaded checkpoint {} (epoch {} Rank-1: {:.2%} mAP: {:.2%})'
+              .format(args.resume, checkpoint['epoch'],checkpoint['cmp'], checkpoint['mAP']))
     else:
         print('==> no checkpoint found at {}'.format(args.resume))
 
