@@ -255,39 +255,40 @@ class build_transformer_local(nn.Module):
 
         self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
         self.classifier.apply(weights_init_classifier)
-        self.classifier_1 = nn.Linear(self.in_planes, self.num_classes, bias=False)
-        self.classifier_1.apply(weights_init_classifier)
-        self.classifier_2 = nn.Linear(self.in_planes, self.num_classes, bias=False)
-        self.classifier_2.apply(weights_init_classifier)
-        self.classifier_3 = nn.Linear(self.in_planes, self.num_classes, bias=False)
-        self.classifier_3.apply(weights_init_classifier)
-        self.classifier_4 = nn.Linear(self.in_planes, self.num_classes, bias=False)
-        self.classifier_4.apply(weights_init_classifier)
-
         self.bottleneck = nn.BatchNorm1d(self.in_planes)
         self.bottleneck.bias.requires_grad_(False)
         self.bottleneck.apply(weights_init_kaiming)
-        self.bottleneck_1 = nn.BatchNorm1d(self.in_planes)
-        self.bottleneck_1.bias.requires_grad_(False)
-        self.bottleneck_1.apply(weights_init_kaiming)
-        self.bottleneck_2 = nn.BatchNorm1d(self.in_planes)
-        self.bottleneck_2.bias.requires_grad_(False)
-        self.bottleneck_2.apply(weights_init_kaiming)
-        self.bottleneck_3 = nn.BatchNorm1d(self.in_planes)
-        self.bottleneck_3.bias.requires_grad_(False)
-        self.bottleneck_3.apply(weights_init_kaiming)
-        self.bottleneck_4 = nn.BatchNorm1d(self.in_planes)
-        self.bottleneck_4.bias.requires_grad_(False)
-        self.bottleneck_4.apply(weights_init_kaiming)
+        if self.use_JPM:
+            self.classifier_1 = nn.Linear(self.in_planes, self.num_classes, bias=False)
+            self.classifier_1.apply(weights_init_classifier)
+            self.classifier_2 = nn.Linear(self.in_planes, self.num_classes, bias=False)
+            self.classifier_2.apply(weights_init_classifier)
+            self.classifier_3 = nn.Linear(self.in_planes, self.num_classes, bias=False)
+            self.classifier_3.apply(weights_init_classifier)
+            self.classifier_4 = nn.Linear(self.in_planes, self.num_classes, bias=False)
+            self.classifier_4.apply(weights_init_classifier)
 
-        self.shuffle_groups = 2
-        print('using shuffle_groups size:{}'.format(self.shuffle_groups))
-        self.shift_num = 5
-        print('using shift_num size:{}'.format(self.shift_num))
-        self.divide_length = 4
-        print('using divide_length size:{}'.format(self.divide_length))
-        self.rearrange = rearrange
-        self.feat_dim = 5 * self.in_planes
+            self.bottleneck_1 = nn.BatchNorm1d(self.in_planes)
+            self.bottleneck_1.bias.requires_grad_(False)
+            self.bottleneck_1.apply(weights_init_kaiming)
+            self.bottleneck_2 = nn.BatchNorm1d(self.in_planes)
+            self.bottleneck_2.bias.requires_grad_(False)
+            self.bottleneck_2.apply(weights_init_kaiming)
+            self.bottleneck_3 = nn.BatchNorm1d(self.in_planes)
+            self.bottleneck_3.bias.requires_grad_(False)
+            self.bottleneck_3.apply(weights_init_kaiming)
+            self.bottleneck_4 = nn.BatchNorm1d(self.in_planes)
+            self.bottleneck_4.bias.requires_grad_(False)
+            self.bottleneck_4.apply(weights_init_kaiming)
+
+            self.shuffle_groups = 2
+            print('using shuffle_groups size:{}'.format(self.shuffle_groups))
+            self.shift_num = 5
+            print('using shift_num size:{}'.format(self.shift_num))
+            self.divide_length = 4
+            print('using divide_length size:{}'.format(self.divide_length))
+            self.rearrange = rearrange
+            self.feat_dim = 5 * self.in_planes
 
     def forward(self, x1, x2, label=None, cam_label= None, view_label=None, modal=0):  # label is unused if self.cos_layer == 'no'
 
@@ -296,42 +297,41 @@ class build_transformer_local(nn.Module):
         # global branch
         b1_feat = self.b1(features) # [64, 129, 768]
         global_feat = b1_feat[:, 0]
-
-        # JPM branch
-        feature_length = features.size(1) - 1
-        patch_length = feature_length // self.divide_length
-        token = features[:, 0:1]
-
-        if self.rearrange:
-            x = shuffle_unit(features, self.shift_num, self.shuffle_groups)
-        else:
-            x = features[:, 1:]
-        # lf_1
-        b1_local_feat = x[:, :patch_length]
-        b1_local_feat = self.b2(torch.cat((token, b1_local_feat), dim=1))
-        local_feat_1 = b1_local_feat[:, 0]
-
-        # lf_2
-        b2_local_feat = x[:, patch_length:patch_length*2]
-        b2_local_feat = self.b2(torch.cat((token, b2_local_feat), dim=1))
-        local_feat_2 = b2_local_feat[:, 0]
-
-        # lf_3
-        b3_local_feat = x[:, patch_length*2:patch_length*3]
-        b3_local_feat = self.b2(torch.cat((token, b3_local_feat), dim=1))
-        local_feat_3 = b3_local_feat[:, 0]
-
-        # lf_4
-        b4_local_feat = x[:, patch_length*3:patch_length*4]
-        b4_local_feat = self.b2(torch.cat((token, b4_local_feat), dim=1))
-        local_feat_4 = b4_local_feat[:, 0]
-
         feat = self.bottleneck(global_feat)
+        if self.use_JPM:
+        # JPM branch
+            feature_length = features.size(1) - 1
+            patch_length = feature_length // self.divide_length
+            token = features[:, 0:1]
 
-        local_feat_1_bn = self.bottleneck_1(local_feat_1)
-        local_feat_2_bn = self.bottleneck_2(local_feat_2)
-        local_feat_3_bn = self.bottleneck_3(local_feat_3)
-        local_feat_4_bn = self.bottleneck_4(local_feat_4)
+            if self.rearrange:
+                x = shuffle_unit(features, self.shift_num, self.shuffle_groups)
+            else:
+                x = features[:, 1:]
+            # lf_1
+            b1_local_feat = x[:, :patch_length]
+            b1_local_feat = self.b2(torch.cat((token, b1_local_feat), dim=1))
+            local_feat_1 = b1_local_feat[:, 0]
+
+            # lf_2
+            b2_local_feat = x[:, patch_length:patch_length*2]
+            b2_local_feat = self.b2(torch.cat((token, b2_local_feat), dim=1))
+            local_feat_2 = b2_local_feat[:, 0]
+
+            # lf_3
+            b3_local_feat = x[:, patch_length*2:patch_length*3]
+            b3_local_feat = self.b2(torch.cat((token, b3_local_feat), dim=1))
+            local_feat_3 = b3_local_feat[:, 0]
+
+            # lf_4
+            b4_local_feat = x[:, patch_length*3:patch_length*4]
+            b4_local_feat = self.b2(torch.cat((token, b4_local_feat), dim=1))
+            local_feat_4 = b4_local_feat[:, 0]
+
+            local_feat_1_bn = self.bottleneck_1(local_feat_1)
+            local_feat_2_bn = self.bottleneck_2(local_feat_2)
+            local_feat_3_bn = self.bottleneck_3(local_feat_3)
+            local_feat_4_bn = self.bottleneck_4(local_feat_4)
 
         if self.training:
             if self.ID_LOSS_TYPE in ('arcface', 'cosface', 'amsoftmax', 'circle'):

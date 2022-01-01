@@ -14,7 +14,10 @@ from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
-from transformer.make_model import *
+#from transformer.make_model import *
+from transformer.vit_for_small_dataset import ViT
+from torch.optim.lr_scheduler import StepLR
+
 from utils import *
 from loss import *
 from tensorboardX import SummaryWriter
@@ -42,16 +45,19 @@ parser.add_argument('--img_w', default=144, type=int,
                     metavar='imgw', help='img width')
 parser.add_argument('--img_h', default=288, type=int,
                     metavar='imgh', help='img height')
-parser.add_argument('--batch-size', default=8, type=int,
+parser.add_argument('--batch-size', default=4, type=int,
                     metavar='B', help='training batch size')
-parser.add_argument('--test-batch', default=24, type=int,
+parser.add_argument('--test-batch', default=48, type=int,
                     metavar='tb', help='testing batch size')
 parser.add_argument('--method', default='agw', type=str,
                     metavar='m', help='method type: base or agw')
 parser.add_argument('--margin', default=0.3, type=float,
                     metavar='margin', help='triplet losses margin')
-parser.add_argument('--num_pos', default=4, type=int,
+parser.add_argument('--num_pos', default=8, type=int,
                     help='num of pos per identity in each modality')
+parser.add_argument('--depth', default=6, type=int,
+                    help='Depth of transformer (layers)')
+
 parser.add_argument('--trial', default=1, type=int,
                     metavar='t', help='trial (only for RegDB dataset)')
 parser.add_argument('--seed', default=0, type=int,
@@ -62,6 +68,16 @@ parser.add_argument('--mode', default='all', type=str, help='all or indoor')
 parser.add_argument('--use_gray', dest='use_gray', help='use gray as 3rd modality', action='store_true')
 parser.add_argument('--separate_batch_norm', dest='separate_batch_norm', help='separate batch norm layers only in first layers',
                     action='store_true')
+
+seed = 23
+random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+torch.backends.cudnn.deterministic = True
+
 parser.set_defaults(use_gray=False)
 parser.set_defaults(separate_batch_norm=False)
 args = parser.parse_args()
@@ -89,10 +105,7 @@ if not os.path.isdir(args.vis_log_path):
     os.makedirs(args.vis_log_path)
 
 suffix = dataset
-if args.method=='agw':
-    suffix = suffix + '_agw_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
-else:
-    suffix = suffix + '_base_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
+suffix = suffix + '_sViT_p{}_n{}_lr_{}_depth_{}'.format(args.num_pos, args.batch_size, args.lr, args.depth)
 
 
 if not args.optim == 'sgd':
@@ -188,11 +201,22 @@ print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
 print('==> Building model..')
 
-patch_net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch='resnet18')
-checkpoint = torch.load("save_model/sysu_base_p8_n16_lr_0.1_seed_0_gray_arch18_best.t")
-patch_net.load_state_dict(checkpoint['net'])
+# patch_net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch='resnet18')
+# checkpoint = torch.load("save_model/sysu_base_p8_n16_lr_0.1_seed_0_gray_arch18_best.t")
+# patch_net.load_state_dict(checkpoint['net'])
 
-net = make_model( num_class=n_class, camera_num=6, view_num = 1, hybrid_backbone=patch_net)
+net = ViT(
+    image_size = (args.img_w, args.img_h),
+    patch_size = 12,
+    num_classes = n_class,
+    dim = 1024,
+    depth = args.depth,
+    heads = 16,
+    mlp_dim = 2048,
+    dropout = 0.1,
+    emb_dropout = 0.1
+)
+
 net.to(device)
 cudnn.benchmark = True
 print(net.count_params())
@@ -230,8 +254,12 @@ criterion_tri.to(device)
 cross_triplet_creiteron.margin_loss.to(device)
 reconst_loss.to(device)
 
-if args.optim == 'sgd':
-    optimizer, optimizer_center = make_optimizer(net, center_criterion)
+lr = 3e-5
+gamma = 0.7
+seed = 42
+optimizer = optim.Adam(net.parameters(), lr=lr)
+# scheduler
+scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
 
 
 # exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
@@ -270,7 +298,7 @@ def train(epoch):
     net.train()
     end = time.time()
 
-    for batch_idx, (input1, input2, label1, label2, cam1, cam2) in enumerate(trainloader):
+    for batch_idx, (input1, input2, input3, label1, label2, _, cam1, cam2) in enumerate(trainloader):
 
         input1 = Variable(input1.cuda())
         input2 = Variable(input2.cuda())
@@ -286,23 +314,22 @@ def train(epoch):
         data_time.update(time.time() - end)
 
 
-        out0, feat, = net(input1, input2, cam_label=cams)
+        feat, out0 = net(input1, input2, cam_label=cams)
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
 
         color_label, thermal_label = torch.split(labels, label1.shape[0])
         loss_tri = []
         loss_id = []
-        for featL, out0L in zip(feat, out0):
-            color_feat, thermal_feat = torch.split(featL, label1.shape[0])
-            loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, thermal_feat,
-                                                 color_label, thermal_label, thermal_label)
-            loss_tri_thermal = cross_triplet_creiteron(thermal_feat, color_feat, color_feat,
-                                                   thermal_label, color_label, color_label)
-            loss_tri.append((loss_tri_color + loss_tri_thermal) / 2)
-            loss_id.append(criterion_id(out0L, labels))
 
-        loss_id = 0.5 * sum(loss_id[1:])/(len(loss_id)-1) + 0.5*loss_id[0]
-        loss_tri = 0.5 * sum(loss_tri[1:])/(len(loss_tri)-1) + 0.5*loss_tri[0]
+        color_feat, thermal_feat = torch.split(feat, label1.shape[0])
+        loss_tri_color = cross_triplet_creiteron(color_feat, thermal_feat, thermal_feat,
+                                             color_label, thermal_label, thermal_label)
+        loss_tri_thermal = cross_triplet_creiteron(thermal_feat, color_feat, color_feat,
+                                               thermal_label, color_label, color_label)
+        loss_tri = (loss_tri_color + loss_tri_thermal) / 2
+        loss_id = criterion_id(out0, labels)
+
+
 
         #loss_tri, batch_acc = criterion_tri(feat, labels)
         #loss_center = hetro_loss(color_feat, thermal_feat, color_label, thermal_label)
@@ -310,8 +337,8 @@ def train(epoch):
 
 
         #correct += (batch_acc / 2)
-        _, predicted = out0[0].max(1)
-        correct += (predicted.eq(labels).sum().item() / 2)
+        _, predicted = out0.max(1)
+        correct += (predicted.eq(labels).sum().item() )
 
         loss = loss_id + loss_tri
 
@@ -361,16 +388,14 @@ def test(epoch):
     start = time.time()
     ptr = 0
     gall_feat = np.zeros((ngall, pool_dim))
-
+    gall_feat_att = np.zeros((ngall, pool_dim))
     with torch.no_grad():
         for batch_idx, (input, label, cam) in enumerate(gall_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
-            start1 = time.time()
-            feat = net(input, input, modal=test_mode[0], cam_label=cam)
-            f = feat.detach().cpu().numpy()
-            print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
-            gall_feat[ptr:ptr + batch_num, :] = f
+            feat, feat_att = net(input, input, x3=input, modal=test_mode[0])
+            gall_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
+            gall_feat_att[ptr:ptr + batch_num, :] = feat_att.detach().cpu().numpy()
             ptr = ptr + batch_num
     print('Extracting Time:\t {:.3f}'.format(time.time() - start))
 
@@ -380,37 +405,78 @@ def test(epoch):
     start = time.time()
     ptr = 0
     query_feat = np.zeros((nquery, pool_dim))
+    query_feat_att = np.zeros((nquery, pool_dim))
     time_inference = 0
     with torch.no_grad():
         for batch_idx, (input, label, cam) in enumerate(query_loader):
             batch_num = input.size(0)
             input = Variable(input.cuda())
             start1 = time.time()
-            feat = net(input, input, modal=test_mode[1], cam_label=cam)
+            feat, feat_att = net(input, input, x3=input, modal=test_mode[1])
             time_inference += (time.time() - start1)
-            f = feat.detach().cpu().numpy()
-            print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
-            query_feat[ptr:ptr + batch_num, :] = f
+            #print('Extracting Time:\t {:.3f} len={:d}'.format(time.time() - start1, len(input)))
+
+            query_feat[ptr:ptr + batch_num, :] = feat.detach().cpu().numpy()
+            query_feat_att[ptr:ptr + batch_num, :] = feat_att.detach().cpu().numpy()
             ptr = ptr + batch_num
     print('Extracting Time:\t {:.3f}'.format(time_inference))
     #exit(0)
-
     start = time.time()
     # compute the similarity
     distmat = np.matmul(query_feat, np.transpose(gall_feat))
+    distmat_att = np.matmul(query_feat_att, np.transpose(gall_feat_att))
 
     # evaluation
     if dataset == 'regdb':
         cmc, mAP, mINP      = eval_regdb(-distmat, query_label, gall_label)
+        cmc_att, mAP_att, mINP_att  = eval_regdb(-distmat_att, query_label, gall_label)
     elif dataset == 'sysu':
         cmc, mAP, mINP = eval_sysu(-distmat, query_label, gall_label, query_cam, gall_cam)
+        cmc_att, mAP_att, mINP_att = eval_sysu(-distmat_att, query_label, gall_label, query_cam, gall_cam)
     print('Evaluation Time:\t {:.3f}'.format(time.time() - start))
 
     writer.add_scalar('rank1', cmc[0], epoch)
     writer.add_scalar('mAP', mAP, epoch)
     writer.add_scalar('mINP', mINP, epoch)
-    return cmc, mAP, mINP
+    writer.add_scalar('rank1_att', cmc_att[0], epoch)
+    writer.add_scalar('mAP_att', mAP_att, epoch)
+    writer.add_scalar('mINP_att', mINP_att, epoch)
+    return cmc, mAP, mINP, cmc_att, mAP_att, mINP_att
 
+def checkResult(epoch):
+    print('Test Epoch: {}'.format(epoch))
+    global best_acc, best_epoch
+    # testing
+    cmc, mAP, mINP, cmc_att, mAP_att, mINP_att = test(epoch)
+    # save model
+    if max(cmc[0], cmc_att[0]) > best_acc:  # not the real best for sysu-mm01
+        best_acc = max(cmc[0], cmc_att[0])
+        best_epoch = epoch
+        state = {
+            'net': net.state_dict(),
+            'cmc': cmc_att,
+            'mAP': mAP_att,
+            'mINP': mINP_att,
+            'epoch': epoch,
+        }
+        torch.save(state, checkpoint_path + suffix + '_best.t')
+
+    # save model
+    if epoch > 10 and epoch % args.save_epoch == 0:
+        state = {
+            'net': net.state_dict(),
+            'cmc': cmc,
+            'mAP': mAP,
+            'epoch': epoch,
+        }
+        if not args.is_test:
+            torch.save(state, checkpoint_path + suffix + '_epoch_{}.t'.format(epoch))
+
+    print('POOL:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
+        cmc[0], cmc[4], cmc[9], cmc[19], mAP, mINP))
+    print('FC:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
+        cmc_att[0], cmc_att[4], cmc_att[9], cmc_att[19], mAP_att, mINP_att))
+    print('Best Epoch [{}]'.format(best_epoch))
 
 # training
 print('==> Start Training...')
@@ -434,36 +500,7 @@ for epoch in range(start_epoch, 82):
                                   sampler=sampler, num_workers=args.workers, drop_last=True)
 
     # training
-    #train(epoch)
+    train(epoch)
 
     if epoch >= 0 and epoch % 4 == 0:
-        print('Test Epoch: {}'.format(epoch))
-
-        # testing
-        cmc, mAP, mINP = test(epoch)
-        # save model
-        if mAP > best_acc:  # not the real best for sysu-mm01
-            best_acc = mAP
-            best_epoch = epoch
-            state = {
-                'net': net.state_dict(),
-                'cmc': cmc,
-                'mAP': mAP,
-                'mINP': mINP,
-                'epoch': epoch,
-            }
-            torch.save(state, checkpoint_path + suffix + '_best.t')
-
-        # save model
-        if epoch > 10 and epoch % args.save_epoch == 0:
-            state = {
-                'net': net.state_dict(),
-                'cmc': cmc,
-                'mAP': mAP,
-                'epoch': epoch,
-            }
-            torch.save(state, checkpoint_path + suffix + '_epoch_{}.t'.format(epoch))
-
-        print('POOL:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
-            cmc[0], cmc[4], cmc[9], cmc[19], mAP, mINP))
-        print('Best Epoch [{}]'.format(best_epoch))
+        checkResult(epoch)
