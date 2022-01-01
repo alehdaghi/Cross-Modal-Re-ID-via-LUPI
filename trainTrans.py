@@ -345,7 +345,7 @@ def train(epoch):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
+        scheduler.step()
         # update P
         train_loss.update(loss.item(), 2 * input1.size(0))
         id_loss.update(loss_id.item(), 2 * input1.size(0))
@@ -480,7 +480,7 @@ def checkResult(epoch):
 
 # training
 print('==> Start Training...')
-for epoch in range(start_epoch, 82):
+for epoch in range(start_epoch, 120):
 
     print('==> Preparing Data Loader...')
     # identity sampler
