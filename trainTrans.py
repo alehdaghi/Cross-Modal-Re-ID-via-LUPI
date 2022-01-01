@@ -479,8 +479,7 @@ def checkResult(epoch):
             'mAP': mAP,
             'epoch': epoch,
         }
-        if not args.is_test:
-            torch.save(state, checkpoint_path + suffix + '_epoch_{}.t'.format(epoch))
+        torch.save(state, checkpoint_path + suffix + '_epoch_{}.t'.format(epoch))
 
     print('POOL:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
         cmc[0], cmc[4], cmc[9], cmc[19], mAP, mINP))
