@@ -257,9 +257,20 @@ reconst_loss.to(device)
 lr = 3e-5
 gamma = 0.7
 seed = 42
-optimizer = optim.Adam(net.parameters(), lr=lr)
+ignored_params = list(map(id, net.normModule.parameters())) \
+                 + list(map(id, net.classifier.parameters()))
+ids = set(map(id, net.parameters()))
+params = filter(lambda p: id(p) in ids, net.parameters())
+base_params = filter(lambda p: id(p) not in ignored_params, params)
+
+optimizer = optim.SGD([
+    {'params': base_params, 'lr': 0.1 * args.lr},
+    {'params': net.bottleneck.parameters(), 'lr': args.lr},
+    {'params': net.classifier.parameters(), 'lr': args.lr}],
+    weight_decay=5e-4, momentum=0.9, nesterov=True)
+
 # scheduler
-scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
+#scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
 
 
 # exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
@@ -345,7 +356,6 @@ def train(epoch):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        scheduler.step()
         # update P
         train_loss.update(loss.item(), 2 * input1.size(0))
         id_loss.update(loss_id.item(), 2 * input1.size(0))
