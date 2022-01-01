@@ -265,7 +265,7 @@ base_params = filter(lambda p: id(p) not in ignored_params, params)
 
 optimizer = optim.SGD([
     {'params': base_params, 'lr': 0.1 * args.lr},
-    {'params': net.bottleneck.parameters(), 'lr': args.lr},
+    {'params': net.normModule.parameters(), 'lr': args.lr},
     {'params': net.classifier.parameters(), 'lr': args.lr}],
     weight_decay=5e-4, momentum=0.9, nesterov=True)
 
