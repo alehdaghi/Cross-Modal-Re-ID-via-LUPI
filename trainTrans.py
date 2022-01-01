@@ -224,7 +224,7 @@ pool_dim = net.feat_dim
 if args.arch == 'resnet18':
     pool_dim = 512
 if len(args.resume) > 0:
-    model_path = checkpoint_path + args.resume
+    model_path = args.resume
     if os.path.isfile(model_path):
         print('==> loading checkpoint {}'.format(args.resume))
         checkpoint = torch.load(model_path)
