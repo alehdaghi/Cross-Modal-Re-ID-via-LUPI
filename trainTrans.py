@@ -118,7 +118,7 @@ if args.separate_batch_norm:
     suffix = suffix + '_sepBatch'
 
 
-suffix = suffix + '_trans'
+suffix = suffix + '_mean'
 
 
 
