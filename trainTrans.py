@@ -232,7 +232,7 @@ if len(args.resume) > 0:
         start_epoch = checkpoint['epoch']
         net.load_state_dict(checkpoint['net'])
         print('==> loaded checkpoint {} (epoch {} Rank-1: {:.2%} mAP: {:.2%})'
-              .format(args.resume, checkpoint['epoch'], checkpoint['cmc'][0], checkpoint['mAP'][0]))
+              .format(args.resume, checkpoint['epoch'], checkpoint['cmc'][0], checkpoint['mAP']))
     else:
         print('==> no checkpoint found at {}'.format(args.resume))
 
