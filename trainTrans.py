@@ -214,7 +214,8 @@ net = ViT(
     heads = 16,
     mlp_dim = 2048,
     dropout = 0.1,
-    emb_dropout = 0.1
+    emb_dropout = 0.1,
+    pool = 'mean'
 )
 
 net.to(device)
