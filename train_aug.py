@@ -48,7 +48,7 @@ parser.add_argument('--batch-size', default=8, type=int,
                     metavar='B', help='training batch size')
 parser.add_argument('--test-batch', default=64, type=int,
                     metavar='tb', help='testing batch size')
-parser.add_argument('--method', default='agw', type=str,
+parser.add_argument('--method', default='base', type=str,
                     metavar='m', help='method type: base or agw, adp')
 parser.add_argument('--margin', default=0.3, type=float,
                     metavar='margin', help='triplet loss margin')
