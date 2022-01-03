@@ -434,7 +434,7 @@ for epoch in range(start_epoch, 100 - start_epoch):
     # training
     train(epoch)
 
-    if epoch > 0 and epoch % 2 == 0:
+    if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))
 
         # testing
