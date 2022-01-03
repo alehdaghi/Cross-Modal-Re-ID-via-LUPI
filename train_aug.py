@@ -344,6 +344,7 @@ def train(epoch):
                 epoch, batch_idx, len(trainloader), current_lr,
                 100. * correct / total, batch_time=batch_time,
                 train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss,kl_loss=kl_loss))
+            sys.stdout.flush()
 
     writer.add_scalar('total_loss', train_loss.avg, epoch)
     writer.add_scalar('id_loss', id_loss.avg, epoch)
