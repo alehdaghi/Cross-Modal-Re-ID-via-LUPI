@@ -100,9 +100,9 @@ if not os.path.isdir(args.vis_log_path):
     os.makedirs(args.vis_log_path)
 
 suffix = dataset
-suffix = suffix + '_aug'
+suffix = suffix + '_aug_adp'
 if args.method != 'base':
-    suffix = suffix + '_adp_' + args.method
+    suffix = suffix + '_' + args.method
 #suffix = suffix + '_KL_{}'.format(args.kl)
 if args.augc==1:
     suffix = suffix + '_aug_G'  
