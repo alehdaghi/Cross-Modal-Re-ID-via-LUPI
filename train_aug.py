@@ -102,7 +102,7 @@ if not os.path.isdir(args.vis_log_path):
 suffix = dataset
 suffix = suffix + '_aug'
 if args.method != 'base':
-    suffix = suffix + '_' + args.method
+    suffix = suffix + '_adp_' + args.method
 #suffix = suffix + '_KL_{}'.format(args.kl)
 if args.augc==1:
     suffix = suffix + '_aug_G'  
@@ -229,7 +229,7 @@ elif args.method == 'adp':
     criterion_tri = TripletLoss_ADP(alpha = args.alpha, gamma = args.gamma, square = args.square)
 else:
     loader_batch = args.batch_size * args.num_pos
-    criterion_tri= OriTripletLoss(batch_size=loader_batch, margin=args.margin)
+    criterion_tri = TripletLoss_ADP(alpha = args.alpha, gamma = args.gamma, square = args.square)
 criterion_kl = KLDivLoss()
 criterion_id.to(device)
 criterion_tri.to(device)
