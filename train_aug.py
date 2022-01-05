@@ -100,7 +100,7 @@ if not os.path.isdir(args.vis_log_path):
     os.makedirs(args.vis_log_path)
 
 suffix = dataset
-suffix = suffix + '_aug_adp'
+suffix = suffix + '_aug_non'
 suffix = suffix + '_' + args.method
 #suffix = suffix + '_KL_{}'.format(args.kl)
 if args.augc==1:
@@ -199,10 +199,10 @@ print('  ------------------------------')
 print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
 print('==> Building model..')
-if args.method =='base':
-    net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch)
-else:
-    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
+# if args.method =='base':
+    # net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch)
+# else:
+net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
 net.to(device)
 cudnn.benchmark = True
 
@@ -228,7 +228,7 @@ elif args.method == 'adp':
     criterion_tri = TripletLoss_ADP(alpha = args.alpha, gamma = args.gamma, square = args.square)
 else:
     loader_batch = args.batch_size * args.num_pos
-    criterion_tri = TripletLoss_ADP(alpha = args.alpha, gamma = args.gamma, square = args.square)
+    criterion_tri = OriTripletLoss(batch_size=loader_batch, margin=args.margin)
 criterion_kl = KLDivLoss()
 criterion_id.to(device)
 criterion_tri.to(device)
