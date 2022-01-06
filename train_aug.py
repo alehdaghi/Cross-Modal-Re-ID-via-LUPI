@@ -100,7 +100,7 @@ if not os.path.isdir(args.vis_log_path):
     os.makedirs(args.vis_log_path)
 
 suffix = dataset
-suffix = suffix + '_aug_non'
+suffix = suffix + '_aug_non_U'
 suffix = suffix + '_' + args.method
 #suffix = suffix + '_KL_{}'.format(args.kl)
 if args.augc==1:
@@ -413,7 +413,7 @@ def test(epoch):
 
 # training
 print('==> Start Training...')
-for epoch in range(start_epoch, 100 - start_epoch):
+for epoch in range(start_epoch, 101 - start_epoch):
 
     print('==> Preparing Data Loader...')
     # identity sampler
