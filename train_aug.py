@@ -14,7 +14,7 @@ import torchvision.transforms as transforms
 from ICCV21_CAJ.data_loader import SYSUData, RegDBData, TestData
 from ICCV21_CAJ.data_manager import *
 from ICCV21_CAJ.eval_metrics import eval_sysu, eval_regdb
-from ICCV21_CAJ.model import embed_net
+from ICCV21_CAJ.model import embed_net, Transformer_block
 from ICCV21_CAJ.utils import *
 from ICCV21_CAJ.loss import OriTripletLoss, TripletLoss_WRT, KLDivLoss, TripletLoss_ADP
 from tensorboardX import SummaryWriter
@@ -202,7 +202,11 @@ print('==> Building model..')
 # if args.method =='base':
     # net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch)
 # else:
-net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
+if args.method != 'transform':
+    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
+else:
+    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, attn_module=Transformer_block)
+
 net.to(device)
 cudnn.benchmark = True
 

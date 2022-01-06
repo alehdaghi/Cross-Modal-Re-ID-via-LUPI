@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 from resnet import resnet50, resnet18
+from transformer.vit import PreNorm, Attention, FeedForward
+from einops import rearrange, repeat
 
 class Normalize(nn.Module):
     def __init__(self, power=2):
@@ -12,6 +14,26 @@ class Normalize(nn.Module):
         norm = x.pow(self.power).sum(1, keepdim=True).pow(1. / self.power)
         out = x.div(norm)
         return out
+
+class Transformer_block(nn.Module):
+    def __init__(self, dim, depth=1, heads=8, attr_dim__ratio=4, mlp_dim_ratio=2, dropout = 0.):
+        super(Transformer_block, self).__init__()
+        self.layers = nn.ModuleList([])
+        dim_head = (dim // attr_dim__ratio) // heads
+        mlp_dim = dim * mlp_dim_ratio
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, Attention(dim, heads = heads, dim_head = dim_head, dropout = dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
+            ]))
+    def forward(self, x):
+        b, c, h, w = x.shape
+        xn = rearrange(x, 'b c h w -> b (h w) c')
+        for attn, ff in self.layers:
+            xn = attn(xn) + xn
+            xn = ff(xn) + xn
+        x = rearrange(xn, 'b (h w) c -> b c h w', h=h)
+        return x
 
 class Non_local(nn.Module):
     def __init__(self, in_channels, reduc_ratio=4):
@@ -143,7 +165,7 @@ class base_resnet(nn.Module):
 
 
 class embed_net(nn.Module):
-    def __init__(self,  class_num, no_local= 'on', gm_pool = 'on', arch='resnet50'):
+    def __init__(self,  class_num, no_local= 'on', gm_pool = 'on', arch='resnet50', attn_module=Non_local):
         super(embed_net, self).__init__()
 
         self.thermal_module = thermal_module(arch=arch)
@@ -154,16 +176,16 @@ class embed_net(nn.Module):
             layers=[3, 4, 6, 3]
             non_layers=[0,2,3,0]
             self.NL_1 = nn.ModuleList(
-                [Non_local(256) for i in range(non_layers[0])])
+                [attn_module(256) for i in range(non_layers[0])])
             self.NL_1_idx = sorted([layers[0] - (i + 1) for i in range(non_layers[0])])
             self.NL_2 = nn.ModuleList(
-                [Non_local(512) for i in range(non_layers[1])])
+                [attn_module(512) for i in range(non_layers[1])])
             self.NL_2_idx = sorted([layers[1] - (i + 1) for i in range(non_layers[1])])
             self.NL_3 = nn.ModuleList(
-                [Non_local(1024) for i in range(non_layers[2])])
+                [attn_module(1024) for i in range(non_layers[2])])
             self.NL_3_idx = sorted([layers[2] - (i + 1) for i in range(non_layers[2])])
             self.NL_4 = nn.ModuleList(
-                [Non_local(2048) for i in range(non_layers[3])])
+                [attn_module(2048) for i in range(non_layers[3])])
             self.NL_4_idx = sorted([layers[3] - (i + 1) for i in range(non_layers[3])])
 
 
