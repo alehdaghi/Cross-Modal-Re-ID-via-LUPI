@@ -62,7 +62,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 dataset = args.dataset
 if dataset == 'sysu':
     data_path = '../Datasets/SYSU-MM01/'
-    n_class = 296
+    n_class = 395
     if args.uni == 0:
         test_mode = [1, 2]  # thermal to visible
     else:
