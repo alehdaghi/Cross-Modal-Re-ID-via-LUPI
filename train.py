@@ -67,6 +67,7 @@ parser.add_argument('--use_gray', dest='use_gray', help='use gray as 3rd modalit
 parser.add_argument('--separate_batch_norm', dest='separate_batch_norm', help='separate batch norm layers only in first layers',
                     action='store_true')
 parser.add_argument('--cont', dest='cont_loss', help='use Contrastive Loss', action='store_true')
+parser.add_argument('--exp', '-e', default='', type=str, help='name of suffix exp')
 parser.set_defaults(use_gray=False)
 parser.set_defaults(separate_batch_norm=False)
 parser.set_defaults(cont_loss=False)
@@ -109,6 +110,9 @@ if not args.optim == 'sgd':
 
 if args.use_gray:
     suffix = suffix + '_gray'
+
+if args.exp != '':
+    suffix = suffix + '_' + args.exp
 
 if args.cont_loss:
     suffix = suffix + '_cont'
