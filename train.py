@@ -10,6 +10,8 @@ from torch.autograd import Variable
 import torch.utils.data as data
 import torchvision
 import torchvision.transforms as transforms
+
+from ICCV21_CAJ.ChannelAug import ChannelRandomErasing
 from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
@@ -145,6 +147,7 @@ transform_train = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     normalize,
+    ChannelRandomErasing(probability = 0.5)
 ])
 transform_test = transforms.Compose([
     transforms.ToPILImage(),

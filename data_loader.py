@@ -29,7 +29,7 @@ class SYSUData(data.Dataset):
         img2,  target2, cam2 = self.train_ir_image[self.tIndex[index]], self.train_ir_label[self.tIndex[index]], self.train_ir_cam[self.tIndex[index]]
         img3, target3 = -1, -1
         if self.returnsGray:
-            img3 = self.rgb2gray(img1)
+            img3 = self.rgb2RandomChannel(img1)
             img3 = self.transform(np.stack((img3,)*3, axis=-1))
             target3 = target1
 
@@ -45,7 +45,12 @@ class SYSUData(data.Dataset):
         return len(self.train_color_label)
 
     def rgb2gray(self, rgb):
-        return np.dot(rgb[..., :3], [0.299, 0.587, 0.144]).astype(rgb.dtype)
+        return np.dot(rgb[..., :3], [0.299, 0.587, 0.114]).astype(rgb.dtype)
+
+    def rgb2RandomChannel(self, rgb):
+        n = np.random.rand(3)
+        n /= n.sum()
+        return np.dot(rgb[..., :3], n).astype(rgb.dtype)
         
 class RegDBData(data.Dataset):
     def __init__(self, data_dir, trial, transform=None, colorIndex = None, thermalIndex = None):
