@@ -99,8 +99,8 @@ if not os.path.isdir(args.vis_log_path):
     os.makedirs(args.vis_log_path)
 
 suffix = dataset
-if args.method=='agw':
-    suffix = suffix + '_agw_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
+if args.method != 'base':
+    suffix = suffix + '_att_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
 else:
     suffix = suffix + '_base_p{}_n{}_lr_{}_seed_{}'.format(args.num_pos, args.batch_size, args.lr, args.seed)
 
@@ -397,6 +397,7 @@ def train(epoch):
                 epoch, batch_idx, len(trainloader), current_lr,
                 100. * correct / total, now=time_now(), batch_time=batch_time,
                 train_loss=train_loss, id_loss=id_loss, tri_loss=tri_loss, gray_loss=gray_loss, center_loss=center_loss))
+            sys.stdout.flush()
 
     writer.add_scalar('total_loss', train_loss.avg, epoch)
     writer.add_scalar('id_loss', id_loss.avg, epoch)
@@ -472,7 +473,7 @@ def test(epoch):
 
 # training
 print('==> Start Training...')
-for epoch in range(start_epoch, 82):
+for epoch in range(start_epoch, 121):
 
     print('==> Preparing Data Loader...')
     # identity sampler
