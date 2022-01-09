@@ -56,6 +56,7 @@ parser.add_argument('--uni', default=0, type=int,
                     help='0: two modality, 1: Only Vis 2: Only Ir 3: Only Gray used in training')
 parser.add_argument('--mode', default='all', type=str, help='all or indoor for sysu')
 parser.add_argument('--tvsearch', action='store_true', help='whether thermal to visible search on RegDB')
+parser.add_argument('--multi', dest='multi_shot', help='multi shot for testing (10 images for each id in gallery instead of 1) ', action='store_true')
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -154,7 +155,7 @@ def extract_query_feat(query_loader):
     print('Extracting Time:\t {:.3f}'.format(time.time()-start))
     return query_feat_pool, query_feat_fc
 
-
+N = 10
 if dataset == 'sysu':
 
     print('==> Resuming from checkpoint..')
@@ -179,7 +180,7 @@ if dataset == 'sysu':
         args.mode = 'Gray'
     query_img, query_label, query_cam = process_query_sysu(data_path, mode=args.mode)
     gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode,
-                                                          trial=0,  single_shot=False)
+                                                          trial=0,  single_shot=(not args.multi_shot))
 
     nquery = len(query_label)
     ngall = len(gall_label)
@@ -196,7 +197,9 @@ if dataset == 'sysu':
     print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
     query_feat_pool, query_feat_fc = extract_query_feat(query_loader)
-    for trial in range(10):
+
+    for trial in range(N):
+
         trial_gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray=args.uni == 3)
         trial_gall_loader = data.DataLoader(trial_gallset, batch_size=args.test_batch, shuffle=False, num_workers=4)
 
@@ -237,13 +240,15 @@ if dataset == 'sysu':
         print(
             'POOL: Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
                 cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
-        exit(0)
+        if args.multi_shot:
+            N = 1
+            break
         gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=trial)
 
 
 elif dataset == 'regdb':
 
-    for trial in range(10):
+    for trial in range(N):
         test_trial = trial +1
         #model_path = checkpoint_path +  args.resume
         model_path = checkpoint_path + 'regdb_awg_p4_n8_lr_0.1_seed_0_trial_{}_best.t'.format(test_trial)
@@ -317,13 +322,13 @@ elif dataset == 'regdb':
                 cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
 
 
-cmc = all_cmc / 10
-mAP = all_mAP / 10
-mINP = all_mINP / 10
+cmc = all_cmc / N
+mAP = all_mAP / N
+mINP = all_mINP / N
 
-cmc_pool = all_cmc_pool / 10
-mAP_pool = all_mAP_pool / 10
-mINP_pool = all_mINP_pool / 10
+cmc_pool = all_cmc_pool / N
+mAP_pool = all_mAP_pool / N
+mINP_pool = all_mINP_pool / N
 print('All Average:')
 print('FC:     Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
         cmc[0], cmc[4], cmc[9], cmc[19], mAP, mINP))

@@ -337,7 +337,7 @@ def train(epoch):
             loss_tri_gray = cross_triplet_creiteron(gray_feat, color_feat, thermal_feat,
                                                     gray_label, color_label, thermal_label)
             loss_tri = (loss_tri_color + loss_tri_thermal + loss_tri_gray) / 3
-            loss_color2gray = reconst_loss(color_feat, gray_feat)
+            loss_color2gray = 10 * reconst_loss(color_feat, gray_feat)
 
         else:
             if args.uni != 0:
