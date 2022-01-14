@@ -164,16 +164,10 @@ class base_resnet(nn.Module):
 
         resnet.layer4[0].downsample[0].stride = (1, 1)
 
-        #self.resnet_part2 = nn.Sequential(resnet.layer2, resnet.layer3, resnet.layer4)
-        self.layer2 = resnet.layer2
-        self.layer3 = resnet.layer3
-        self.layer4 = resnet.layer4
-
+        self.resnet_part2 = nn.Sequential(resnet.layer2, resnet.layer3, resnet.layer4)
 
     def forward(self, x):
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.resnet_part2(x)
         return x
 
     def count_params(self):
@@ -188,14 +182,12 @@ class embed_net(nn.Module):
         self.visible_module = ShallowModule(arch=arch)
         self.gray_module = ShallowModule(arch=arch)
 
-
         if separate_batch_norm :
             make_conv_params_same(self.visible_module, self.thermal_module)
             make_conv_params_same(self.gray_module, self.thermal_module)
 
 
         self.base_resnet = base_resnet(arch=arch)
-
         self.non_local = no_local
         if self.non_local =='on':
             layers=[3, 4, 6, 3]
@@ -249,7 +241,7 @@ class embed_net(nn.Module):
             NL1_counter = 0
             if len(self.NL_1_idx) == 0: self.NL_1_idx = [-1]
             # for i in range(len(self.base_resnet.base.layer1)):
-            #     x = self.base_resnet.layer1[i](x)
+            #     x = self.base_resnet.base.layer1[i](x)
             #     if i == self.NL_1_idx[NL1_counter]:
             #         _, C, H, W = x.shape
             #         x = self.NL_1[NL1_counter](x)
@@ -257,8 +249,8 @@ class embed_net(nn.Module):
             # Layer 2
             NL2_counter = 0
             if len(self.NL_2_idx) == 0: self.NL_2_idx = [-1]
-            for i in range(len(self.base_resnet.layer2)):
-                x = self.base_resnet.layer2[i](x)
+            for i in range(len(self.base_resnet.resnet_part2[0])):
+                x = self.base_resnet.resnet_part2[0][i](x)
                 if i == self.NL_2_idx[NL2_counter]:
                     _, C, H, W = x.shape
                     x = self.NL_2[NL2_counter](x)
@@ -266,8 +258,8 @@ class embed_net(nn.Module):
             # Layer 3
             NL3_counter = 0
             if len(self.NL_3_idx) == 0: self.NL_3_idx = [-1]
-            for i in range(len(self.base_resnet.layer3)):
-                x = self.base_resnet.layer3[i](x)
+            for i in range(len(self.base_resnet.resnet_part2[1])):
+                x = self.base_resnet.resnet_part2[1][i](x)
                 if i == self.NL_3_idx[NL3_counter]:
                     _, C, H, W = x.shape
                     x = self.NL_3[NL3_counter](x)
@@ -275,8 +267,8 @@ class embed_net(nn.Module):
             # Layer 4
             NL4_counter = 0
             if len(self.NL_4_idx) == 0: self.NL_4_idx = [-1]
-            for i in range(len(self.base_resnet.layer4)):
-                x = self.base_resnet.layer4[i](x)
+            for i in range(len(self.base_resnet.resnet_part2[2])):
+                x = self.base_resnet.resnet_part2[2][i](x)
                 if i == self.NL_4_idx[NL4_counter]:
                     _, C, H, W = x.shape
                     x = self.NL_4[NL4_counter](x)
