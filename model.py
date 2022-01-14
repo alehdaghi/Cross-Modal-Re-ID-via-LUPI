@@ -299,9 +299,6 @@ class embed_net(nn.Module):
         retX_pool = x_pool
         retFeat = self.classifier(feat)
 
-        if not self.training :
-            retX_pool = self.l2norm(x_pool)
-            retFeat = self.l2norm(feat)
 
         if with_feature:
             return retX_pool, retFeat, x
@@ -311,8 +308,10 @@ class embed_net(nn.Module):
             cont_x = self.contrastive_hidden_layer(x_pool)
             cont_x = self.contrastive_output_layer(cont_x)
             cont_x = F.normalize(cont_x, dim=1)
-
-        return retX_pool, retFeat, cont_x
+        if self.training :
+            return retX_pool, retFeat, cont_x
+        else:
+            self.l2norm(x_pool), self.l2norm(feat)
 
     def getPoolDim(self):
         return self.pool_dim
