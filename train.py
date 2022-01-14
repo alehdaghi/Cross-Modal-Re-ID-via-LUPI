@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
+from einops import rearrange
 from torch.autograd import Variable
 import torch.utils.data as data
 import torchvision
@@ -363,9 +364,11 @@ def train(epoch):
         correct += (predicted.eq(labels).sum().item() / 2)
 
         if args.cont_loss:
-            feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
-            loss_cont = criterion_contrastive(feat, labels[:bs])
-            loss = loss_cont + loss_id
+            #feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
+            view_size = 2 if args.use_gray else 3
+            p = rearrange(F.normalize(feat), '(v b p) ... -> b (v p) ...', v = view_size, b=args.batch_size)
+            loss_cont = criterion_contrastive(p)
+            loss = loss_cont + loss_id + loss_color2gray
         else:
             loss = loss_id + loss_tri + loss_color2gray #+ loss_center
 
@@ -378,7 +381,7 @@ def train(epoch):
         id_loss.update(loss_id.item(), 2 * input1.size(0))
         tri_loss.update(loss_tri.item(), 2 * input1.size(0))
         gray_loss.update(loss_color2gray.item(), 2 * input1.size(0))
-        #center_loss.update(loss_center.item(), 2 * input1.size(0))
+        center_loss.update(loss_cont.item(), 2 * input1.size(0))
         total += labels.size(0)
 
         # measure elapsed time
@@ -494,7 +497,7 @@ for epoch in range(start_epoch, 121):
 
     # training
     train(epoch)
-
+#329, 329, 329, 329, 318, 318, 318, 318, 329, 329, 329, 329, 318, 318, 318, 318
     if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))
 

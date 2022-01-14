@@ -2,6 +2,7 @@ from __future__ import print_function, absolute_import
 import os
 import numpy as np
 import random
+from datetime import datetime
 
 def process_query_sysu(data_path, mode = 'all', relabel=False, file_path='exp/test_id.txt'):
     if mode== 'all':
@@ -66,8 +67,8 @@ def process_gallery_sysu(data_path, mode = 'all', trial = 0, single_shot=True,  
                 if single_shot:
                     files_rgb.append(random.choice(new_files))
                 else:
-                    #files_rgb.extend(random.choices(new_files, k = 10))
-                    files_rgb.extend(new_files)
+                    files_rgb.extend(random.choices(new_files, k = 10))
+                    #files_rgb.extend(new_files)
     gall_img = []
     gall_id = []
     gall_cam = []

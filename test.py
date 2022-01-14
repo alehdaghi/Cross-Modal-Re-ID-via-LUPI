@@ -12,6 +12,9 @@ from eval_metrics import eval_sysu, eval_regdb
 from model import embed_net
 from utils import *
 import pdb
+import random
+from datetime import datetime
+random.seed(datetime.now())
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
 parser.add_argument('--dataset', default='sysu', help='dataset name: regdb or sysu]')
@@ -240,10 +243,10 @@ if dataset == 'sysu':
         print(
             'POOL: Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
                 cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
-        if args.multi_shot:
-            N = 1
-            break
-        gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=trial)
+        #if args.multi_shot:
+        #    N = 1
+        #    break
+        gall_img, gall_label, gall_cam = process_gallery_sysu(data_path, mode=args.mode, trial=trial+1, single_shot=(not args.multi_shot))
 
 
 elif dataset == 'regdb':
