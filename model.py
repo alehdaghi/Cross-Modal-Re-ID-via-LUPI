@@ -311,7 +311,7 @@ class embed_net(nn.Module):
         if self.training :
             return retX_pool, retFeat, cont_x
         else:
-            self.l2norm(x_pool), self.l2norm(feat)
+            return self.l2norm(x_pool), self.l2norm(feat)
 
     def getPoolDim(self):
         return self.pool_dim
