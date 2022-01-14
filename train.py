@@ -366,7 +366,7 @@ def train(epoch):
         if args.cont_loss:
             #feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
             view_size = 2 if args.use_gray else 3
-            p = rearrange(F.normalize(feat), '(v b p) ... -> b (v p) ...', v = view_size, b=args.batch_size)
+            p = rearrange(F.normalize(feat, dim=1), '(v b p) ... -> b (v p) ...', v = view_size, b=args.batch_size)
             loss_cont = criterion_contrastive(p)
             loss = loss_cont + loss_id + loss_color2gray
         else:
@@ -497,7 +497,7 @@ for epoch in range(start_epoch, 121):
 
     # training
     train(epoch)
-#329, 329, 329, 329, 318, 318, 318, 318, 329, 329, 329, 329, 318, 318, 318, 318
+
     if epoch >= 0 and epoch % 4 == 0:
         print('Test Epoch: {}'.format(epoch))
 
