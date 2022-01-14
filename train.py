@@ -213,9 +213,9 @@ print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
 print('==> Building model..')
 if args.method =='base':
-    net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
+    net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch, separate_batch_norm=args.separate_batch_norm, use_contrast=args.cont_loss)
 else:
-    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, separate_batch_norm=args.separate_batch_norm)
+    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, separate_batch_norm=args.separate_batch_norm, use_contrast=args.cont_loss)
 
 net.to(device)
 cudnn.benchmark = True
@@ -325,7 +325,7 @@ def train(epoch):
         labels = Variable(labels.cuda())
         data_time.update(time.time() - end)
 
-        feat, out0, = net(input1, input2, x3=input3, modal=args.uni)
+        feat, out0, contrast_feat = net(input1, input2, x3=input3, modal=args.uni)
 
         loss_color2gray = torch.tensor(0.0, requires_grad=True, device=device)
         if args.use_gray:
@@ -366,7 +366,8 @@ def train(epoch):
         if args.cont_loss:
             #feat = torch.cat([F.normalize(color_feat, dim=1).unsqueeze(1), F.normalize(thermal_feat, dim=1).unsqueeze(1)], dim=1)
             view_size = 2 if args.use_gray else 3
-            p = rearrange(F.normalize(feat, dim=1), '(v b p) ... -> b (v p) ...', v = view_size, b=args.batch_size)
+            #p = rearrange(F.normalize(feat, dim=1), '(v b p) ... -> b (v p) ...', v = view_size, b=args.batch_size)
+            p = rearrange(contrast_feat, '(v b p) ... -> b (v p) ...', v = view_size, b=args.batch_size)
             loss_cont = criterion_contrastive(p)
             loss = loss_cont + loss_id + loss_color2gray
         else:

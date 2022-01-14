@@ -4,6 +4,7 @@ from torch.nn import init
 from resnet import resnet50, resnet18
 import torchvision
 import copy
+import torch.nn.functional as F
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -175,7 +176,8 @@ class base_resnet(nn.Module):
         return s
 
 class embed_net(nn.Module):
-    def __init__(self,  class_num, no_local= 'on', gm_pool = 'on', arch='resnet50', separate_batch_norm=False):
+    def __init__(self,  class_num, no_local= 'on', gm_pool = 'on', arch='resnet50',
+                 separate_batch_norm=False, use_contrast=False):
         super(embed_net, self).__init__()
 
         self.thermal_module = ShallowModule(arch=arch)
@@ -185,6 +187,7 @@ class embed_net(nn.Module):
         if separate_batch_norm :
             make_conv_params_same(self.visible_module, self.thermal_module)
             make_conv_params_same(self.gray_module, self.thermal_module)
+
 
 
         self.base_resnet = base_resnet(arch=arch)
@@ -209,6 +212,13 @@ class embed_net(nn.Module):
             self.pool_dim = 2048
         else:
             self.pool_dim = 512
+
+        self.use_contrast = use_contrast
+        if self.use_contrast:
+            contrastive_dimension = 512
+            self.contrastive_hidden_layer = nn.Linear(self.pool_dim, contrastive_dimension)
+            self.contrastive_output_layer = nn.Linear(contrastive_dimension, contrastive_dimension)
+
 
         self.l2norm = Normalize(2)
         self.bottleneck = nn.BatchNorm1d(self.pool_dim)
@@ -295,7 +305,14 @@ class embed_net(nn.Module):
 
         if with_feature:
             return retX_pool, retFeat, x
-        return retX_pool, retFeat
+
+        cont_x = None
+        if self.use_contrast:
+            cont_x = self.contrastive_hidden_layer(x_pool)
+            cont_x = self.contrastive_output_layer(cont_x)
+            cont_x = F.normalize(cont_x, dim=1)
+
+        return retX_pool, retFeat, cont_x
 
     def getPoolDim(self):
         return self.pool_dim
