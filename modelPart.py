@@ -156,10 +156,12 @@ class embed_net(nn.Module):
 
         loss_body_cont, loss_cont, loss_mask = 0, 0, 0
         if self.training:
-            b = x.shape[0]
+            b, _, w, h = x.shape
             masks_correlation = torch.einsum('b p w h, b c w h -> b p c', masks , masks)
             loss_mask = torch.triu(masks_correlation, diagonal = 1).sum() / (b * self.part_num * (self.part_num - 1) / 2)
-
+            loss_reg_mask = w * h / 3 - torch.diagonal(masks_correlation, dim1=1, dim2=2).sum() / b
+            if loss_reg_mask.item() > 0 :
+                loss_mask =  loss_mask + loss_reg_mask
             # p = rearrange(F.normalize(bodyFeatParts, dim=1), '(v b p) ... -> b (v p) ...', v = view_size, b=b // view_size)
             loss_body_cont = self.criterion_contrastive(F.normalize(bodyFeatParts, dim=2))
 
@@ -168,6 +170,8 @@ class embed_net(nn.Module):
         feat_pool = torch.cat([x_global, weighted_part_feat], dim=1)
         feat = self.bottleneck(feat_pool)
 
+        if with_feature:
+            return feat_pool, feat, masks, x, parts_weight
 
         if not self.training :
             return self.l2norm(feat), self.l2norm(feat_pool)
