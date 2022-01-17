@@ -141,7 +141,8 @@ class embed_net(nn.Module):
         else:
             x = self.base_resnet.resnet_part2[0](x) # layer2
             x = self.base_resnet.resnet_part2[1](x) # layer3
-            bodyFeat = self.partFeat_module(x)
+            if self.training:
+                bodyFeat = self.partFeat_module(x)
             x = self.base_resnet.resnet_part2[2](x) # layer4
 
         masks = self.extractPartsMask(x)
@@ -152,16 +153,19 @@ class embed_net(nn.Module):
         parts_feat = torch.stack(parts_feat, dim = 1)
         weighted_part_feat = torch.einsum('b p, b p c -> b c', parts_weight, parts_feat)
 
-        bodyFeatParts = torch.stack([self.gl_pool(bodyFeat*m) for m in masks.split(1, dim=1)], dim=0) # index of each part matters
+
 
         loss_body_cont, loss_cont, loss_mask = 0, 0, 0
         if self.training:
+            bodyFeatParts = torch.stack([self.gl_pool(bodyFeat*m) for m in masks.split(1, dim=1)], dim=0) # index of each part matters
             b, _, w, h = x.shape
             masks_correlation = torch.einsum('b p w h, b c w h -> b p c', masks , masks)
             loss_mask = torch.triu(masks_correlation, diagonal = 1).sum() / (b * self.part_num * (self.part_num - 1) / 2)
-            loss_reg_mask = w * h / 3 - torch.diagonal(masks_correlation, dim1=1, dim2=2).sum() / b
-            if loss_reg_mask.item() > 0 :
-                loss_mask =  loss_mask + loss_reg_mask
+            diag = torch.diagonal(masks_correlation, dim1=1, dim2=2)
+            for i in range(self.part_num):
+                loss_reg_mask = w * h / (2*self.part_num) - diag[:,i].sum() / b
+                if loss_reg_mask.item() > 0 :
+                    loss_mask =  loss_mask + loss_reg_mask
             # p = rearrange(F.normalize(bodyFeatParts, dim=1), '(v b p) ... -> b (v p) ...', v = view_size, b=b // view_size)
             loss_body_cont = self.criterion_contrastive(F.normalize(bodyFeatParts, dim=2))
 
