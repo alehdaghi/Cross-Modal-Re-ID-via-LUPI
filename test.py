@@ -9,7 +9,9 @@ import torchvision.transforms as transforms
 from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
+from loss import pdist_np
 from model import embed_net
+from modelPart import embed_net as embed_net_part
 from utils import *
 import pdb
 import random
@@ -60,6 +62,7 @@ parser.add_argument('--uni', default=0, type=int,
 parser.add_argument('--mode', default='all', type=str, help='all or indoor for sysu')
 parser.add_argument('--tvsearch', action='store_true', help='whether thermal to visible search on RegDB')
 parser.add_argument('--multi', dest='multi_shot', help='multi shot for testing (10 images for each id in gallery instead of 1) ', action='store_true')
+parser.add_argument('--cont', dest='cont_loss', help='use Contrastive Loss', action='store_true')
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
@@ -74,7 +77,7 @@ if dataset == 'sysu':
 
 elif dataset =='regdb':
     data_path = '../Datasets/RegDB/'
-    n_class = 206
+    n_class = 395
     test_mode = [2, 1]
  
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -83,11 +86,11 @@ start_epoch = 0
 
 print('==> Building model..')
 if args.method =='base':
-    net = embed_net(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch)
+    net = embed_net_part(n_class, no_local= 'off', gm_pool =  'off', arch=args.arch)
     # print(net.count_params())
 else:
-    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch)
-pool_dim = 2048 #net.getPoolDim()
+    net = embed_net(n_class, no_local= 'on', gm_pool = 'on', arch=args.arch, use_contrast=args.cont_loss)
+pool_dim = net.getPoolDim()
 if args.arch == 'resnet18':
     pool_dim = 512
 print(net.thermal_module.count_params())
@@ -159,20 +162,25 @@ def extract_query_feat(query_loader):
     return query_feat_pool, query_feat_fc
 
 N = 10
-if dataset == 'sysu':
+print('==> Resuming from checkpoint..')
+if len(args.resume) > 0:
+    model_path = args.resume
+    # model_path = checkpoint_path + 'sysu_awg_p4_n8_lr_0.1_seed_0_best.t'
+    if os.path.isfile(model_path):
+        print('==> loading checkpoint {}'.format(args.resume))
+        checkpoint = torch.load(model_path)
+        net.load_state_dict(checkpoint['net'])
+        print('==> loaded checkpoint {} (epoch {})'
 
-    print('==> Resuming from checkpoint..')
-    if len(args.resume) > 0:
-        model_path = args.resume
-        # model_path = checkpoint_path + 'sysu_awg_p4_n8_lr_0.1_seed_0_best.t'
-        if os.path.isfile(model_path):
-            print('==> loading checkpoint {}'.format(args.resume))
-            checkpoint = torch.load(model_path)
-            net.load_state_dict(checkpoint['net'])
-            print('==> loaded checkpoint {} (epoch {})'
-                  .format(args.resume, checkpoint['epoch']))
-        else:
-            print('==> no checkpoint found at {}'.format(args.resume))
+              .format(args.resume, checkpoint['epoch']))
+    else:
+        print('==> no checkpoint found at {}'.format(args.resume))
+
+all_cmc, all_mAP, all_mINP = [], [], []
+all_cmc_pool, all_mAP_pool, all_mINP_pool = [], [], []
+
+
+if dataset == 'sysu':
 
     # testing set
     if args.uni == 1:
@@ -205,7 +213,7 @@ if dataset == 'sysu':
 
         trial_gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray=args.uni == 3)
         trial_gall_loader = data.DataLoader(trial_gallset, batch_size=args.test_batch, shuffle=False, num_workers=4)
-
+        ngall = len(trial_gallset)
         gall_feat_pool, gall_feat_fc = extract_gall_feat(trial_gall_loader)
 
         # gall_feat_pool, query_feat_pool, gall_feat_fc, query_feat_fc \
@@ -216,25 +224,22 @@ if dataset == 'sysu':
         # pool5 feature
         start = time.time()
         distmat_pool = np.matmul(query_feat_pool, np.transpose(gall_feat_pool))
+        #distmat_pool = pdist_np(query_feat_pool, gall_feat_pool)
+        gall_label = trial_gallset.test_label
+        gall_cam = trial_gallset.test_cam
         cmc_pool, mAP_pool, mINP_pool = eval_sysu(-distmat_pool, query_label, gall_label, query_cam, gall_cam)
 
         # fc feature
         distmat = np.matmul(query_feat_fc, np.transpose(gall_feat_fc))
         cmc, mAP, mINP = eval_sysu(-distmat, query_label, gall_label, query_cam, gall_cam)
-        if trial == 0:
-            all_cmc = cmc
-            all_mAP = mAP
-            all_mINP = mINP
-            all_cmc_pool = cmc_pool
-            all_mAP_pool = mAP_pool
-            all_mINP_pool = mINP_pool
-        else:
-            all_cmc = all_cmc + cmc
-            all_mAP = all_mAP + mAP
-            all_mINP = all_mINP + mINP
-            all_cmc_pool = all_cmc_pool + cmc_pool
-            all_mAP_pool = all_mAP_pool + mAP_pool
-            all_mINP_pool = all_mINP_pool + mINP_pool
+
+        all_cmc.append(cmc)
+        all_mAP.append(mAP)
+        all_mINP.append(mINP)
+        all_cmc_pool.append(cmc_pool)
+        all_mAP_pool.append(mAP_pool)
+        all_mINP_pool.append(mINP_pool)
+
         print('Evaluating Time:\t {:.3f}'.format(time.time() - start))
         print('Test Trial: {}'.format(trial))
         print(
@@ -253,12 +258,12 @@ elif dataset == 'regdb':
 
     for trial in range(N):
         test_trial = trial +1
-        #model_path = checkpoint_path +  args.resume
-        model_path = checkpoint_path + 'regdb_awg_p4_n8_lr_0.1_seed_0_trial_{}_best.t'.format(test_trial)
-        if os.path.isfile(model_path):
-            print('==> loading checkpoint {}'.format(args.resume))
-            checkpoint = torch.load(model_path)
-            net.load_state_dict(checkpoint['net'])
+        # #model_path = checkpoint_path +  args.resume
+        # model_path = checkpoint_path + 'regdb_awg_p4_n8_lr_0.1_seed_0_trial_{}_best.t'.format(test_trial)
+        # if os.path.isfile(model_path):
+        #     print('==> loading checkpoint {}'.format(args.resume))
+        #     checkpoint = torch.load(model_path)
+        #     net.load_state_dict(checkpoint['net'])
 
         # training set
         trainset = RegDBData(data_path, test_trial, transform=transform_train)
@@ -266,16 +271,16 @@ elif dataset == 'regdb':
         color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_ir_label)
 
         # testing set
-        query_img, query_label = process_test_regdb(data_path, trial=test_trial, modal='visible')
-        gall_img, gall_label = process_test_regdb(data_path, trial=test_trial, modal='thermal')
+        query_img, query_label, query_cam = process_test_regdb(data_path, trial=test_trial, modal='visible')
+        gall_img, gall_label, gall_cam = process_test_regdb(data_path, trial=test_trial, modal='thermal')
 
-        gallset = TestData(gall_img, gall_label, transform=transform_test, img_size=(args.img_w, args.img_h))
+        gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
         gall_loader = data.DataLoader(gallset, batch_size=args.test_batch, shuffle=False, num_workers=args.workers)
 
         nquery = len(query_label)
         ngall = len(gall_label)
 
-        queryset = TestData(query_img, query_label, transform=transform_test, img_size=(args.img_w, args.img_h))
+        queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h))
         query_loader = data.DataLoader(queryset, batch_size=args.test_batch, shuffle=False, num_workers=4)
         print('Data Loading Time:\t {:.3f}'.format(time.time() - end))
 
@@ -325,15 +330,16 @@ elif dataset == 'regdb':
                 cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
 
 
-cmc = all_cmc / N
-mAP = all_mAP / N
-mINP = all_mINP / N
+cmc = [np.asarray(all_cmc).mean(axis=0), np.asarray(all_cmc).var(axis=0)]
+mAP = [np.asarray(all_mAP).mean(axis=0), np.asarray(all_mAP).var(axis=0)]
+mINP = [np.asarray(all_mINP).mean(axis=0), np.asarray(all_mINP).var(axis=0)]
 
-cmc_pool = all_cmc_pool / N
-mAP_pool = all_mAP_pool / N
-mINP_pool = all_mINP_pool / N
+cmc_pool = [np.asarray(all_cmc_pool).mean(axis=0), np.asarray(all_cmc_pool).var(axis=0)]
+mAP_pool = [np.asarray(all_mAP_pool).mean(axis=0), np.asarray(all_mAP_pool).var(axis=0)]
+mINP_pool = [np.asarray(all_mINP_pool).mean(axis=0), np.asarray(all_mINP_pool).var(axis=0)]
+
 print('All Average:')
-print('FC:     Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
-        cmc[0], cmc[4], cmc[9], cmc[19], mAP, mINP))
-print('POOL:   Rank-1: {:.2%} | Rank-5: {:.2%} | Rank-10: {:.2%}| Rank-20: {:.2%}| mAP: {:.2%}| mINP: {:.2%}'.format(
-    cmc_pool[0], cmc_pool[4], cmc_pool[9], cmc_pool[19], mAP_pool, mINP_pool))
+print('FC:     Rank-1: {:.2%}±{:.2%} | Rank-5: {:.2%}±{:.2%} | Rank-10: {:.2%}±{:.2%}| Rank-20: {:.2%}± {:.2%}| mAP: {:.2%}±{:.2%}| mINP: {:.2%}±{:.2%}'.format(
+        cmc[0][0], cmc[1][0], cmc[0][4],cmc[1][4], cmc[0][9],cmc[1][9], cmc[0][19],cmc[1][9], mAP[0],mAP[1], mINP[0], mINP[1]))
+print('POOL:   Rank-1: {:.2%}±{:.2%} | Rank-5: {:.2%}±{:.2%} | Rank-10: {:.2%}±{:.2%}| Rank-20: {:.2%}± {:.2%}| mAP: {:.2%}±{:.2%}| mINP: {:.2%}±{:.2%}'.format(
+        cmc_pool[0][0], cmc_pool[1][0], cmc_pool[0][4],cmc_pool[1][4], cmc_pool[0][9],cmc_pool[1][9], cmc_pool[0][19],cmc_pool[1][9], mAP_pool[0],mAP_pool[1], mINP_pool[0], mINP_pool[1]))
