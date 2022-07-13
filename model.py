@@ -290,6 +290,7 @@ class embed_net(nn.Module):
             x = x.view(b, c, -1)
             p = 3.0
             x_pool = (torch.mean(x**p, dim=-1) + 1e-12)**(1/p)
+            x = x.view(b,c, h, w)
         else:
             x_pool = self.avgpool(x)
             x_pool = x_pool.view(x_pool.size(0), x_pool.size(1))
@@ -301,7 +302,7 @@ class embed_net(nn.Module):
 
 
         if with_feature:
-            return retX_pool, retFeat, x
+            return x_pool, feat, None, x, None
 
         cont_x = None
         if self.use_contrast:

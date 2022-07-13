@@ -185,8 +185,8 @@ elif dataset == 'regdb':
     color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_ir_label)
 
     # testing set
-    query_img, query_label = process_test_regdb(data_path, trial=args.trial, modal='visible')
-    gall_img, gall_label = process_test_regdb(data_path, trial=args.trial, modal='thermal')
+    query_img, query_label, query_cam = process_test_regdb(data_path, trial=args.trial, modal='visible')
+    gall_img, gall_label, gall_cam = process_test_regdb(data_path, trial=args.trial, modal='thermal')
 
 gallset = TestData(gall_img, gall_label, gall_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray= args.uni == 3)
 queryset = TestData(query_img, query_label, query_cam, transform=transform_test, img_size=(args.img_w, args.img_h), colorToGray= args.uni == 3)
@@ -382,7 +382,7 @@ def train(epoch):
         id_loss.update(loss_id.item(), 2 * input1.size(0))
         tri_loss.update(loss_tri.item(), 2 * input1.size(0))
         gray_loss.update(loss_color2gray.item(), 2 * input1.size(0))
-        center_loss.update(loss_cont.item(), 2 * input1.size(0))
+        # center_loss.update(loss_cont.item(), 2 * input1.size(0))
         total += labels.size(0)
 
         # measure elapsed time

@@ -19,7 +19,7 @@ from datetime import datetime
 random.seed(datetime.now())
 
 parser = argparse.ArgumentParser(description='PyTorch Cross-Modality Training')
-parser.add_argument('--dataset', default='sysu', help='dataset name: regdb or sysu]')
+parser.add_argument('--dataset', '-d', default='sysu', help='dataset name: regdb or sysu]')
 parser.add_argument('--lr', default=0.1 , type=float, help='learning rate, 0.00035 for adam')
 parser.add_argument('--optim', default='sgd', type=str, help='optimizer')
 parser.add_argument('--arch', '-a', default='resnet50', type=str,

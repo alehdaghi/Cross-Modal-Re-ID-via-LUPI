@@ -41,7 +41,7 @@ def process_query_sysu(data_path, mode = 'all', relabel=False, file_path='exp/te
 
 def process_gallery_sysu(data_path, mode = 'all', trial = 0, single_shot=True,  file_path='exp/test_id.txt'):
     
-    random.seed(trial)
+    random.seed(datetime.now())
     
     if mode== 'all':
         rgb_cameras = ['cam1','cam2','cam4','cam5']
@@ -90,5 +90,6 @@ def process_test_regdb(img_dir, trial = 1, modal = 'visible'):
         # Get full list of image and labels
         file_image = [img_dir + '/' + s.split(' ')[0] for s in data_file_list]
         file_label = [int(s.split(' ')[1]) for s in data_file_list]
+        file_cam = np.asarray([(modal=='visible') + 1] * len(data_file_list))
         
-    return file_image, np.array(file_label)
+    return file_image, np.array(file_label), file_cam

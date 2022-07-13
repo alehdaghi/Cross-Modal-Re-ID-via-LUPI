@@ -47,7 +47,8 @@ class SYSUData(data.Dataset):
     def rgb2gray(self, rgb):
         return np.dot(rgb[..., :3], [0.299, 0.587, 0.114]).astype(rgb.dtype)
 
-    def rgb2RandomChannel(self, rgb):
+    @staticmethod
+    def rgb2RandomChannel(rgb):
         n = np.random.rand(3)
         n /= n.sum()
         return np.dot(rgb[..., :3], n).astype(rgb.dtype)
@@ -98,7 +99,7 @@ class RegDBData(data.Dataset):
         img2,  target2 = self.train_thermal_image[self.tIndex[index]], self.train_ir_label[self.tIndex[index]]
         img3, target3 = -1, -1
         if self.returnsGray:
-            img3 = self.rgb2RandomChannel(img1)
+            img3 = SYSUData.rgb2RandomChannel(img1)
             img3 = self.transform(np.stack((img3,) * 3, axis=-1))
             target3 = target1
 
@@ -114,28 +115,30 @@ class RegDBData(data.Dataset):
     def rgb2gray(self, rgb):
         return np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
 
-    def rgb2RandomChannel(self, rgb):
-        n = np.random.rand(3)
-        n /= n.sum()
-        return np.dot(rgb[..., :3], n).astype(rgb.dtype)
 
 
 class TestData(data.Dataset):
     def __init__(self, test_img_file, test_label, test_cam, transform=None, img_size = (144,288), colorToGray=False):
 
         test_image = []
+        ret_test_label,  ret_test_cam = [],[]
         for i in range(len(test_img_file)):
             img = Image.open(test_img_file[i])
             img = img.resize((img_size[0], img_size[1]), Image.ANTIALIAS)
             pix_array = np.array(img)
             if colorToGray:
-                pix_array = np.dot(pix_array[..., :3], [0.299, 0.587, 0.144]).astype(pix_array.dtype)
-                pix_array = np.stack((pix_array,)*3, axis=-1)
+                for j in range(9):
+                    test_image.append(np.stack((SYSUData.rgb2RandomChannel(pix_array),)*3, axis=-1))
+                    ret_test_label.append(test_label[i])
+                    ret_test_cam.append(test_cam[i])
+
+            ret_test_cam.append(test_cam[i])
+            ret_test_label.append(test_label[i])
             test_image.append(pix_array)
         test_image = np.array(test_image)
         self.test_image = test_image
-        self.test_label = test_label
-        self.test_cam = test_cam
+        self.test_label = np.array(ret_test_label)
+        self.test_cam = np.array(ret_test_cam)
         self.transform = transform
 
     def __getitem__(self, index):
