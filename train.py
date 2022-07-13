@@ -180,7 +180,7 @@ if dataset == 'sysu':
 
 elif dataset == 'regdb':
     # training set
-    trainset = RegDBData(data_path, args.trial, transform=transform_train)
+    trainset = RegDBData(data_path, args.trial, transform=transform_train, gray=(args.use_gray or args.uni == 3))
     # generate the idx of each person identity
     color_pos, thermal_pos = GenIdx(trainset.train_color_label, trainset.train_ir_label)
 

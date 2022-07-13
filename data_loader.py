@@ -53,7 +53,7 @@ class SYSUData(data.Dataset):
         return np.dot(rgb[..., :3], n).astype(rgb.dtype)
         
 class RegDBData(data.Dataset):
-    def __init__(self, data_dir, trial, transform=None, colorIndex = None, thermalIndex = None):
+    def __init__(self, data_dir, trial, transform=None, colorIndex = None, thermalIndex = None, gray=False):
         # Load training images (path) and labels
         data_dir = '../Datasets/RegDB/'
         train_color_list   = data_dir + 'idx/train_visible_{}'.format(trial)+ '.txt'
@@ -90,24 +90,34 @@ class RegDBData(data.Dataset):
         self.transform = transform
         self.cIndex = colorIndex
         self.tIndex = thermalIndex
+        self.returnsGray = gray
 
     def __getitem__(self, index):
 
         img1,  target1 = self.train_color_image[self.cIndex[index]],  self.train_color_label[self.cIndex[index]]
         img2,  target2 = self.train_thermal_image[self.tIndex[index]], self.train_ir_label[self.tIndex[index]]
-        img3 = self.rgb2gray(img1)
+        img3, target3 = -1, -1
+        if self.returnsGray:
+            img3 = self.rgb2RandomChannel(img1)
+            img3 = self.transform(np.stack((img3,) * 3, axis=-1))
+            target3 = target1
 
         img1 = self.transform(img1)
         img2 = self.transform(img2)
         img3 = self.transform(img3)
 
-        return img1, img2, img3, target1, target2, target1
+        return img1, img2, img3, target1, target2, target3, 1, 2
 
     def __len__(self):
         return len(self.train_color_label)
 
     def rgb2gray(self, rgb):
         return np.dot(rgb[..., :3], [0.299, 0.587, 0.144])
+
+    def rgb2RandomChannel(self, rgb):
+        n = np.random.rand(3)
+        n /= n.sum()
+        return np.dot(rgb[..., :3], n).astype(rgb.dtype)
 
 
 class TestData(data.Dataset):
