@@ -12,7 +12,7 @@ import torch.utils.data as data
 import torchvision
 import torchvision.transforms as transforms
 
-from ICCV21_CAJ.ChannelAug import ChannelRandomErasing
+from utility.ChannelEraceAug import ChannelRandomErasing
 from data_loader import SYSUData, RegDBData, TestData
 from data_manager import *
 from eval_metrics import eval_sysu, eval_regdb
